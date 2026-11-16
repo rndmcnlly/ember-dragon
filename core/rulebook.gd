@@ -228,10 +228,27 @@ class Drop:
 		arena.drop(powerup)
 
 
+## summon rival: a second dragon, steered by the rival AI, hatches far from the player.
+class Summon:
+	extends Action
+
+	static func read(words: PackedStringArray) -> Variant:
+		return Summon.new() if " ".join(words) == "summon rival" else 'expected "summon rival"'
+
+	func run(arena: Arena) -> void:
+		arena.summon_rival()
+
+
 ## Each verb of the language and the Action class that reads it.
 static func verbs() -> Dictionary:
 	return {
-		"say": Say, "spread": Spread, "replace": Replace, "place": Place, "move": Move, "drop": Drop
+		"say": Say,
+		"spread": Spread,
+		"replace": Replace,
+		"place": Place,
+		"move": Move,
+		"drop": Drop,
+		"summon": Summon,
 	}
 
 
@@ -297,14 +314,14 @@ func _read_rule(line: String) -> String:
 	return ""
 
 
-## Rules never drop a wall or lava on the dragon or right in front of it, and never
+## Rules never drop a wall or lava on a dragon or right in front of one, and never
 ## put the ember or a pickup on ground where it could not have appeared.
 static func safe(arena: Arena, cell: Vector2i, kind: String) -> bool:
 	var row: Dictionary = Board.TILES[kind]
 	if cell == arena.food or cell == arena.pickup_cell:
 		return row.spawns
 	if row.solid or row.deadly:
-		return not (arena.dragon.body.has(cell) or arena.near_head(cell))
+		return not (arena.on_a_dragon(cell) or arena.near_head(cell))
 	return true
 
 

@@ -8,10 +8,12 @@ const EMBER := Color(1.0, 0.45, 0.12)
 const ARCANE := Color(0.65, 0.35, 1.0)
 const BLOOD := Color(1.0, 0.15, 0.1)
 const GOLD := Color(1.0, 0.8, 0.3)
+const CRIMSON := Color(1.0, 0.1, 0.2)  # the rival's color
 const TILE_SPARKS := {"lava": EMBER, "water": Color(0.45, 0.75, 1.0), "wall": Color(0.7, 0.62, 0.5)}
 const MAX_SHAKE := 0.5  # camera offset in meters at full trauma
 
 var camera: Camera3D
+var arena: Arena  # the game being watched; listeners read it here, never capture it
 var _trauma := 0.0  # 0..1; the shake grows with its square, so small bumps stay subtle
 var _flash := ColorRect.new()
 var _sparks := {}  # color -> Mesh, one glowing cube per color shared by every burst
@@ -27,16 +29,21 @@ func _init(follow: Camera3D) -> void:
 	add_child(layer)
 
 
-## Subscribe to a new game's Arena. The old Arena's connections die with it.
-func watch(arena: Arena) -> void:
-	arena.ate.connect(func(cell): _burst(_center(cell), EMBER, 24, 4.0))
-	arena.powered.connect(
+## Subscribe to a new game's Arena. The listeners reach the Arena through this node's
+## arena field instead of capturing it: a lambda that captures the Arena it listens to
+## is a cycle (Arena, signal, lambda, Arena) that RefCounted never frees, so every
+## finished game used to stay in memory. Capturing self, a Node, makes no cycle.
+func watch(game: Arena) -> void:
+	arena = game
+	game.ate.connect(func(cell): _burst(_center(cell), EMBER, 24, 4.0))
+	game.rival_ate.connect(func(cell): _burst(_center(cell), CRIMSON, 24, 4.0))
+	game.powered.connect(
 		func(_powerup):
 			_burst(_center(arena.dragon.body[0]), ARCANE, 40, 6.0)
 			_flash_screen(ARCANE, 0.25)
 	)
 	# Rules changed the ground: a puff where a few tiles changed, a flash when many did.
-	arena.board.changed.connect(
+	game.board.changed.connect(
 		func(cells):
 			var color: Color = TILE_SPARKS.get(arena.board.kind_at(cells[0]), GOLD)
 			if cells.size() > 6:
@@ -45,12 +52,12 @@ func watch(arena: Arena) -> void:
 			for cell in cells:
 				_burst(_center(cell), color, 14, 3.0)
 	)
-	arena.won.connect(
+	game.won.connect(
 		func():
 			_burst(_center(arena.dragon.body[0]), GOLD, 90, 8.0)
 			_flash_screen(GOLD, 0.3)
 	)
-	arena.died.connect(
+	game.died.connect(
 		func(_reason):
 			var heading := arena.dragon.heading
 			var impact := _center(arena.dragon.body[0]) + Vector3(heading.x, 0, heading.y) * 0.5
@@ -58,6 +65,11 @@ func watch(arena: Arena) -> void:
 			_flash_screen(BLOOD, 0.35)
 			_trauma = 1.0
 			_slow_motion(0.25, 0.6)
+	)
+	game.rival_crashed.connect(
+		func(cell):
+			_burst(_center(cell), CRIMSON, 70, 7.0)
+			_trauma = maxf(_trauma, 0.6)
 	)
 
 

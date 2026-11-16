@@ -612,6 +612,32 @@ def make_object(name, build):
     bpy.context.scene.collection.objects.link(bpy.data.objects.new(name, mesh))
 
 
+# The rival: the same shapes in obsidian and crimson ----------------------------------------
+
+# Each of the hero's materials and the rival's stand-in. A builder paints faces with the
+# hero's materials; rival() repaints them afterward, so the shapes are never copied.
+RIVAL_PALETTE = {
+    SCALES: pbr_material("RivalScales", "#26222c", metallic=0.5, roughness=0.22, vertex_color=True),
+    BELLY_PLATES: pbr_material("RivalBelly", "#8c1f26", metallic=0.1, roughness=0.5, vertex_color=True),
+    GOLD: pbr_material("RivalSpikes", "#d02a2a", metallic=0.9, roughness=0.28),
+    HORN: pbr_material("RivalHorn", "#3a3036", roughness=0.35, vertex_color=True),
+    EYE: pbr_material("RivalEye", "#ff2e3a", roughness=0.2, emission="#ff1a2a", strength=6.0),
+    FLAME: pbr_material("RivalFlame", "#c0182a", roughness=0.35, emission="#ff1030", strength=1.8),
+}
+
+
+def rival(build):
+    """A builder for the rival's version of a piece: build it, then swap the palette."""
+
+    def build_rival(bm):
+        seams = build(bm)
+        for face in bm.faces:
+            face.material_index = RIVAL_PALETTE.get(face.material_index, face.material_index)
+        return seams
+
+    return build_rival
+
+
 PIECES = {  # the dragon kit; the Godot side finds each mesh by these names
     "head": build_head,
     "straight": build_straight,
@@ -620,6 +646,8 @@ PIECES = {  # the dragon kit; the Godot side finds each mesh by these names
     "food": build_food,
     "pickup": build_pickup,
 }
+for piece in ("head", "straight", "turn", "tail"):  # rival_head, rival_straight, ...
+    PIECES["rival_" + piece] = rival(PIECES[piece])
 TILES = {  # one entry per kind of ground; a new kind is one build_ function and one line here
     "floor": build_floor,
     "wall": build_wall,

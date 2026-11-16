@@ -33,6 +33,7 @@ func test_mistakes_cite_the_line() -> void:
 		"at tick 1: say hello": "say needs its words in quotes",
 		"at tick 1: drop speed": 'expected "drop" and a powerup',
 		"at tick 1: place lava at 3": 'expected "place KIND at X,Y"',
+		"at tick 1: summon dragon": 'expected "summon rival"',
 	}
 	for line in cases:
 		var book := Rulebook.parse("# first line\n" + line, "bad.rules")

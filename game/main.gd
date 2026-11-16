@@ -5,9 +5,6 @@ extends Node3D
 
 const TICK_SECONDS := 0.11
 const CAMERA_OFFSET := Vector3(0, 6, 5)
-const WAVE_HEIGHT := 0.06  # how far each segment rises and falls
-const WAVE_SPEED := 8.0  # radians per second
-const WAVE_STEP := 0.8  # radians between neighbors, so the wave runs head to tail
 const DIRECTIONS := {
 	"ui_up": Vector2i.UP,
 	"ui_down": Vector2i.DOWN,
@@ -20,10 +17,12 @@ var step: Campaign.Step  # where we are in the campaign
 var level: Level  # that step's map
 var problems: Array[String] = []  # mistakes in the level or rules file, shown on the banner
 var arena: Arena
+var player: PlayerController  # this game's keyboard controller; arrow keys go here
 var stage: Stage
 var meshes := {}  # piece name -> Mesh, shared by every node that shows it (Flyweight)
 var sounds := {}  # sound name -> AudioStreamPlayer
-var segments: Array[MeshInstance3D] = []
+var hero: DragonView
+var rival: DragonView
 var food_node := MeshInstance3D.new()
 var ember_light := OmniLight3D.new()
 var pickup_node := MeshInstance3D.new()
@@ -33,8 +32,7 @@ var score_label := Label.new()
 var banner := Label.new()
 var notice := Label.new()  # what the level's rules say during play
 var _clock := 0.0
-var _previous: Array[Vector2i] = []  # the body before the latest tick, to draw in-between
-var _head_yaw := 0.0
+var _rival_drawn: Dragon  # the rival the view is drawing, to notice one hatching
 
 
 func _ready() -> void:
@@ -42,6 +40,10 @@ func _ready() -> void:
 	_load_sounds()
 	stage = Stage.new(meshes)
 	add_child(stage)
+	hero = DragonView.new(meshes)
+	rival = DragonView.new(meshes, "rival_")  # same shapes, the rival's palette
+	add_child(hero)
+	add_child(rival)
 	_build_props()
 	_build_hud()
 	_load_level(0)
@@ -63,7 +65,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	for action in DIRECTIONS:
 		if event.is_action_pressed(action):
 			arena.start()
-			arena.dragon.turn(DIRECTIONS[action])
+			player.press(DIRECTIONS[action])
 
 
 ## Rules tick at a fixed rate; drawing happens every frame, between ticks too.
@@ -72,11 +74,14 @@ func _process(delta: float) -> void:
 	_clock += delta
 	while _clock >= period and arena.state == Arena.State.PLAYING:
 		_clock -= period
-		_previous = arena.dragon.body.duplicate()
+		hero.before_tick(arena.dragon.body)
+		if arena.rival != null:
+			rival.before_tick(arena.rival.body)
 		arena.tick()
 	if arena.state != Arena.State.PLAYING:
 		_clock = 0.0
-	var head := _draw_dragon(_clock / period, delta)
+	var head := hero.draw(arena.dragon.body, _clock / period, delta, arena.ghost)
+	_draw_rival(_clock / period, delta)
 	_draw_props(delta)
 	_follow(head, delta)
 	_draw_hud()
@@ -94,6 +99,8 @@ func _load_level(index: int) -> void:
 
 func _new_game() -> void:
 	arena = Arena.new(level.board.copy(), randi())  # a copy: rules may change the ground
+	player = PlayerController.new()
+	arena.controller = player
 	step.prepare(arena)
 	problems = level.errors.duplicate()
 	if not step.rules.is_empty():
@@ -109,10 +116,12 @@ func _new_game() -> void:
 	arena.powered.connect(func(_powerup): sounds["power"].play())
 	arena.died.connect(func(_reason): sounds["crash"].play())
 	arena.won.connect(func(): sounds["power"].play())
+	arena.rival_ate.connect(func(_cell): sounds["rival_eat"].play())
+	arena.rival_crashed.connect(func(_cell): sounds["crash"].play())
 	effects.watch(arena)
 	_clock = 0.0
-	_previous = arena.dragon.body.duplicate()
-	_head_yaw = Kit.layout(arena.dragon.body)[0][1] * PI / 2
+	hero.reset(arena.dragon.body)
+	_draw_rival(0.0, 0.0)
 	camera.position = _center(arena.dragon.body[0]) + CAMERA_OFFSET
 
 
@@ -143,6 +152,11 @@ func _load_sounds() -> void:
 		player.stream = load("res://sfx/%s.wav" % sound_name)
 		add_child(player)
 		sounds[sound_name] = player
+	var growl := AudioStreamPlayer.new()  # the rival eats with a deeper crunch
+	growl.stream = sounds["eat"].stream
+	growl.pitch_scale = 0.7
+	add_child(growl)
+	sounds["rival_eat"] = growl
 
 
 func _build_props() -> void:
@@ -208,47 +222,13 @@ func _announce(text: String) -> void:
 	tween.tween_property(notice, "modulate:a", 0.0, 0.8)
 
 
-## Draw the dragon partway between its last two ticks (t from 0 to 1). The cells in
-## between already form a continuous body, so only the ends need to move: the head
-## slides out of the neck, and the old tail slides into the cell it leaves behind.
-## Returns where the head is drawn, for the camera.
-func _draw_dragon(t: float, delta: float) -> Vector3:
-	var body := arena.dragon.body
-	var path: Array[Vector2i] = body.duplicate()
-	var old_tail: Vector2i = _previous.back()
-	var tail_slides := (old_tail - body[-1]).length_squared() == 1  # not growing or trimmed
-	if tail_slides:
-		path.append(old_tail)
-	while segments.size() < path.size():
-		var segment := MeshInstance3D.new()
-		add_child(segment)
-		segments.append(segment)
-
-	var placed := Kit.layout(path)
-	var now := Time.get_ticks_msec() / 1000.0
-	for i in segments.size():
-		var segment := segments[i]
-		segment.visible = i < path.size()
-		if not segment.visible:
-			continue
-		segment.mesh = meshes[Kit.Piece.keys()[placed[i][0]].to_lower()]
-		segment.position = _center(path[i])
-		segment.rotation.y = placed[i][1] * PI / 2
-		segment.transparency = 0.5 if arena.ghost else 0.0
-		# The wave's phase follows each cell's age (i + t), so it never jumps on a tick.
-		segment.position.y = WAVE_HEIGHT * (1 + sin(now * WAVE_SPEED - (i + t) * WAVE_STEP))
-
-	var head := segments[0]
-	if (_previous[0] - body[0]).length_squared() == 1:
-		head.position = _center(_previous[0]).lerp(_center(body[0]), t)
-		head.position.y = WAVE_HEIGHT * (1 + sin(now * WAVE_SPEED))
-	_head_yaw = lerp_angle(_head_yaw, head.rotation.y, 1 - exp(-30 * delta))
-	head.rotation.y = _head_yaw
-	if tail_slides:
-		var tail := segments[path.size() - 1]
-		var lift := tail.position.y
-		tail.position = _center(old_tail).lerp(_center(body[-1]), t) + Vector3.UP * lift
-	return head.position
+## The rival may hatch, or crash, in any tick; the view follows whichever is current.
+func _draw_rival(t: float, delta: float) -> void:
+	if arena.rival != _rival_drawn:
+		_rival_drawn = arena.rival
+		rival.reset(arena.rival.body if arena.rival != null else [] as Array[Vector2i])
+	if arena.rival != null:
+		rival.draw(arena.rival.body, t, delta)
 
 
 func _draw_props(delta: float) -> void:
@@ -274,6 +254,10 @@ func _draw_hud() -> void:
 	if arena.goal > 0:
 		embers += " / %d" % arena.goal
 	var lines := [level.title, embers]
+	if arena.rival != null:
+		lines.append(
+			"Rival  %d" % arena.rival_score + (" / %d" % arena.goal if arena.goal > 0 else "")
+		)
 	for powerup in arena.active:
 		lines.append("%s  %d" % [powerup.title, powerup.remaining])
 	score_label.text = "\n".join(lines)
@@ -284,6 +268,8 @@ func _draw_hud() -> void:
 				level.blurb,
 				"Eat %d embers to clear it" % arena.goal if arena.goal > 0 else "No goal: fly free",
 			]
+			if arena.rival != null:
+				intro.append("A rival dragon races you for them. Head-on, the longer dragon wins.")
 			intro.append_array(problems)
 			intro.append("Arrow keys to fly    %s" % _picker())
 			banner.text = "\n".join(intro)

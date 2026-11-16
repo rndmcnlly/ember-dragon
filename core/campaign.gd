@@ -19,12 +19,15 @@ class Step:
 	var pickups: Array[GDScript] = [HastePowerup, GhostPowerup, TrimPowerup]  # all, unless told
 	var tempo := 1.0  # the level's base speed; Haste and water multiply it
 	var rules := ""  # a file in levels/, without .rules, scripting events (see Rulebook)
+	var rival := false  # a rival dragon from the start (rules can also summon one later)
 
 	## Tune a fresh Arena to this step.
 	func prepare(arena: Arena) -> void:
 		arena.goal = goal
 		arena.pickup_kinds = pickups.duplicate()
 		arena.tempo = tempo
+		if rival:
+			arena.summon_rival()
 
 
 var title := ""
@@ -69,6 +72,12 @@ func faster(factor: float) -> Campaign:
 ## Script the level's events with a rules file from levels/, e.g. "eruption".
 func with_rules(file: String) -> Campaign:
 	_latest().rules = file
+	return self
+
+
+## A rival dragon races you for the same embers from the first move.
+func with_rival() -> Campaign:
+	_latest().rival = true
 	return self
 
 

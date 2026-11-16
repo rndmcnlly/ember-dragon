@@ -22,6 +22,8 @@ joining the project.
 | rule | one line of a `.rules` file: when, then what | `Rulebook.Rule` |
 | pickup | a powerup waiting on the board | `Arena.pickup` |
 | effect | a powerup in progress, counting down ticks | `Arena.active` |
+| controller | whoever steers a dragon: the keyboard, the AI, or a replay | `Controller` |
+| rival | a second dragon, steered by the AI, racing you for embers | `Arena.rival` |
 
 ## Where things live
 
@@ -40,6 +42,8 @@ joining the project.
   particles later means adding a listener, not editing the rules.
 - **Strategy:** each `Powerup` subclass changes the arena its own way. A new one is
   a new file plus one line in `Arena.pickup_kinds`; no `match` on powerup names.
+  Controllers are Strategy too: the keyboard, the rival's AI, and a replay each steer
+  a dragon through the same one-method interface (see Rival dragon).
 - **Flyweight:** every segment shares one of four meshes.
 - **Type Object:** `Board.TILES` says what each tile kind means (`solid`, `deadly`,
   `pace`, `spawns`). The Arena asks `board.is_solid(cell)`, never "is this a wall?",
@@ -63,8 +67,7 @@ joining the project.
 
 ## Next, if we had another week
 
-Terrain generation as another Strategy (rocks the dragon must avoid), and a
-rival dragon steered by a simple AI using the same `Dragon` class.
+Terrain generation as another Strategy (rocks the dragon must avoid).
 
 ## Look and feel
 
@@ -87,6 +90,9 @@ The adapter is now three files: `game/main.gd` (loop, input, dragon, HUD),
 - **Juice is a listener:** `Effects.watch(arena)` subscribes to `ate`, `powered`,
   and `died` for sparks, screen flashes, camera shake, and slow motion. Deleting
   `effects.gd` and its two lines in `main.gd` leaves a working, quieter game.
+  Its listeners read the Arena from a field instead of capturing it: a lambda that
+  captures the Arena it listens to is a cycle RefCounted never frees, and every
+  finished game used to stay in memory (`tests/effects_test.gd` guards this).
 - **Not available on the web renderer:** screen-space reflections, volumetric fog,
   depth of field, and glow levels or blend modes. We left them out.
 
@@ -216,6 +222,55 @@ at score 11: place lava from 19,12 to 20,13
 turns the ring into a lake, and at 11 the island cracks open. Then break a line in
 `eruption.rules` and watch the title banner name it.
 
+## Rival dragon
+
+**Where:** `core/controllers/` (`controller.gd`, `player_controller.gd`,
+`greedy_controller.gd`), the two-dragon tick in `core/arena.gd` (`tick`, `_crash`,
+`_collide`, `summon_rival`), `game/dragon_view.gd`, the `rival()` palette swap at the end
+of `tools/build_art.py`, `tests/rival_test.gd`.
+**Pattern:** Strategy, for who steers. A `Controller` has one method,
+`steer(arena, dragon)`, called once per tick just before that dragon moves. The
+keyboard is one controller (`PlayerController`: keys wait there until the tick), the
+AI is another (`GreedyController`), and the Arena treats both dragons with the same
+rules, in the same function.
+
+```gdscript
+controller.steer(self, dragon)
+if rival != null:
+	rival_controller.steer(self, rival)
+var next := dragon.steer()
+var rival_next := rival.steer() if rival != null else NOWHERE
+```
+
+- **The AI is greedy, with a flood fill for safety.** Of straight, left, and right it
+  never takes a move that crashes, avoids a move whose open space (counted by flood
+  fill) could not hold its body, steers clear of a head-on it would lose, and then
+  heads for the ember as the crow flies. As the crow flies, not by path: rivers and
+  walls fool it, which is what makes it beatable. A test proves it will not dive into
+  a one-cell pocket for an ember, and another hands the *player's* dragon to the AI
+  too and lets two AIs fly every map: the rules do not care who is steering.
+- **Collisions, decided.** Both dragons decide, then both crashes are judged on where
+  everything was before anyone moved, so neither has the first move. Into the other's
+  body: that dragon crashes (a tail tip about to move away is safe, as with your own).
+  Head to head, in the same cell or swapping cells: the longer dragon wins, so every
+  ember is armor; equals both fall, and since the player falls, the game ends. Ghost
+  passes through the rival, both ways. A crashed rival is gone for the level.
+- **What the rival does not share.** Pickups are the player's alone (the rival flies
+  over them), and there is one clock: the rival keeps the player's pace, Haste and
+  water included. The rival does race you to the level's goal: if it eats that many
+  embers first, you lose.
+- **Optional per level, two ways.** `.with_rival()` in the campaign (the internal DSL)
+  starts a level with one, as Fire Meets Water does; `summon rival` in a rules file
+  (the external DSL) brings one mid-level, as The Ford does at 3 embers. Either way it
+  hatches at least 12 moves away, at a spot picked by the Arena's seeded `rng`.
+- **A distinct look from the same kit.** `rival()` in `build_art.py` wraps any piece
+  builder and repaints its faces from `RIVAL_PALETTE` (obsidian scales, crimson belly
+  and spikes, red eyes and flame), so `rival_head` and friends share every shape with
+  the hero and no geometry is copied. `DragonView` draws either set, by name prefix.
+
+**Try it:** play The Ford (2) and eat three embers, or Fire Meets Water (4) from the
+start. Tempt the rival across your body, or let it grow and meet it head-on.
+
 ## Menu
 
 | Item | Group | Files |
@@ -224,5 +279,6 @@ turns the ring into a lake, and at 11 the island cracks open. Then break a line 
 | Internal DSL | Language | `core/campaign.gd`, `levels/campaign.gd`, `tests/campaign_test.gd` |
 | External DSL | Language | `core/rulebook.gd`, `levels/*.rules`, `levels/README.md`, `tests/rulebook_test.gd` |
 | Powerups | Systems | `core/powerup.gd`, `core/powerups/` |
+| Rival dragon | Systems | `core/controllers/`, `core/arena.gd`, `game/dragon_view.gd`, `tools/build_art.py` (`rival()`), `tests/rival_test.gd` |
 | Sound as code | Content | `tools/build_sfx.py`, `sfx/` |
 | Showcase art | Content | `tools/build_art.py`, `art/`, `game/stage.gd`, `game/effects.gd` |

@@ -63,6 +63,7 @@ at score 11: place lava from 19,12 to 20,13
 | `place KIND from X,Y to X,Y` | a rectangle of cells |
 | `move ember` | the ember jumps somewhere new |
 | `drop POWERUP` | a `haste`, `ghost`, or `trim` pickup appears |
+| `summon rival` | a rival dragon (the AI) hatches far from you and races you for embers |
 
 Rules never put a wall or lava on the dragon or within three moves of its head,
 and never strand the ember on ground where it could not have appeared.
