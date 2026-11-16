@@ -51,7 +51,7 @@ func restage(campaign: Campaign) -> Arena:
 		)
 		return null
 	var step := campaign.steps[level - 1]
-	var arena := step.play(step.load_level(), seed)
+	var arena := step.play(step.load_level(seed), seed)  # a grown map grows from it too
 	arena.controller = Playback.new(turns)
 	arena.start()
 	return arena

@@ -19,6 +19,7 @@ var campaign: Campaign = preload("res://levels/campaign.gd").ember_trail()
 var step: Campaign.Step  # where we are in the campaign
 var level: Level  # that step's map
 var problems: Array[String] = []  # mistakes in the level or rules file, shown on the banner
+var wild_seed := 0  # the seed the Wilds grow from: today's, a shared one, or a new roll
 var arena: Arena
 var player: PlayerController  # this game's keyboard controller; arrow keys go here
 var tape: Replay  # the player's current or last game, recorded as it is played
@@ -52,7 +53,9 @@ func _ready() -> void:
 	add_child(rival)
 	_build_props()
 	_build_hud()
-	_load_level(0)
+	var shared := _shared_seed()
+	wild_seed = shared if shared > 0 else _daily_seed()
+	_load_level(_wilds_step() if shared > 0 else 0)
 
 
 ## Input arrives as events, so even a tap shorter than one frame is never missed.
@@ -65,6 +68,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.keycode == KEY_R:
 			_watch(tape if tape.ticks > 0 else Replay.load_file(REPLAY_PATH))
+			return
+		if _growing() and event.keycode in [KEY_N, KEY_D]:  # another map, or today's
+			wild_seed = randi_range(1, 99999) if event.keycode == KEY_N else _daily_seed()
+			_new_game()
 			return
 		if event.keycode == KEY_S and tape.ticks > 0:
 			var saved := tape.save(REPLAY_PATH)
@@ -110,25 +117,27 @@ func _process(delta: float) -> void:
 	_draw_hud()
 
 
-## Read a campaign step's map and rules from levels/. A broken file still gives a
-## playable field, with its errors on screen so the designer can fix them.
 func _load_level(index: int) -> void:
 	step = campaign.steps[index]
-	level = step.load_level()
+	_new_game()
+
+
+## A fresh game of this step, recorded from the first key. Its map and rules are read
+## fresh, so a fixed typo shows on the next try; a broken file still gives a playable
+## field, with its errors on screen. A grown map keeps its seed from try to try (the
+## seed is the map); a drawn one rolls a new seed each time.
+func _new_game() -> void:
+	var seed := wild_seed if _growing() else randi()
+	level = step.load_level(seed)
 	problems = level.errors.duplicate()
 	problems.append_array(step.rulebook().errors)
 	for problem in problems:
 		push_warning(problem)
-	_new_game()
-
-
-## A fresh game of this level, recorded from the first key.
-func _new_game() -> void:
 	watching = null
 	tape = Replay.new()
 	tape.level = _number()
 	tape.map = step.map
-	tape.seed = randi()
+	tape.seed = seed
 	player = PlayerController.new()
 	tape.turns = player.log  # the same Dictionary: the controller writes, the tape keeps
 	_show(step.play(level, tape.seed))
@@ -142,7 +151,7 @@ func _watch(replay: Replay) -> void:
 		_announce("\n".join(replay.errors))
 		return
 	step = campaign.steps[replay.level - 1]
-	level = step.load_level()
+	level = step.load_level(replay.seed)
 	watching = replay
 	_show(restaged)
 
@@ -377,4 +386,33 @@ func _number() -> int:
 
 
 func _picker() -> String:
-	return "1-%d to pick a level" % mini(campaign.steps.size(), 9)
+	var keys := "1-%d to pick a level" % mini(campaign.steps.size(), 9)
+	return keys + ("    N new seed    D daily" if _growing() else "")
+
+
+## Whether this step's map grows from a seed (see core/terrain.gd).
+func _growing() -> bool:
+	return step.map == Terrain.NAME
+
+
+## The campaign's Wilds step, or the first step if it has none.
+func _wilds_step() -> int:
+	return maxi(campaign.steps.map(func(s): return s.map).find(Terrain.NAME), 0)
+
+
+## Today's date as a number, e.g. 20261115: everyone in the Wilds today shares a map.
+func _daily_seed() -> int:
+	var today := Time.get_date_dict_from_system()
+	return today.year * 10000 + today.month * 100 + today.day
+
+
+## A seed to open the Wilds with, from the page's address (index.html?seed=4821) or
+## the command line (godot -- --seed=4821), so a link can share a map. 0 if none.
+func _shared_seed() -> int:
+	var given := ""
+	if OS.has_feature("web"):
+		given = str(JavaScriptBridge.eval("new URLSearchParams(location.search).get('seed')"))
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--seed="):
+			given = arg.trim_prefix("--seed=")
+	return given.to_int() if given.is_valid_int() else 0

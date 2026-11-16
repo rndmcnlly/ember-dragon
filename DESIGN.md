@@ -12,6 +12,7 @@ joining the project.
 | board | the ground: one tile kind per cell | `Board.tiles` |
 | tile kind | what a cell is made of (floor, wall, lava, water, bridge) and what that means to the rules | `Board.TILES` |
 | level | a map in `levels/*.txt`: headers, then one character per cell | `Level` |
+| the Wilds | the campaign's endless last step, on a map grown from a seed | `Terrain` |
 | pace | how fast the clock runs (tempo times Haste); the ground under each head then decides whether that dragon moves on a tick | `Arena.pace()`, `Arena.will_move()` |
 | tick | one step of the rules; each dragon moves one cell, or half a stride in water | `Arena.tick()` |
 | body | the dragon's cells, head first | `Dragon.body` |
@@ -68,7 +69,7 @@ joining the project.
 
 ## Next, if we had another week
 
-Terrain generation as another Strategy (rocks the dragon must avoid).
+A seed box in the game, so a shared seed can be typed in as well as linked.
 
 ## Look and feel
 
@@ -328,6 +329,51 @@ ticks: 234
 Reload the page and press R on the title banner: the saved game plays back (in the
 browser, `user://` lives in IndexedDB).
 
+## Procedural terrain
+
+**Where:** `core/terrain.gd` (the generator), `Campaign.wilds()` and `Step.load_level()`
+in `core/campaign.gd`, `levels/wilds.rules`, `Level.to_text()` in `core/level.gd`,
+`tests/terrain_test.gd`; the N and D keys and `_shared_seed()` in `game/main.gd`.
+**Pattern:** Strategy, for where a level comes from, plus seeded generation. A step's
+map is read from a file or grown by `Terrain` from the game's seed; both hand back a
+`Level`, and nothing downstream (Arena, Stage, rules, replays) can tell which.
+
+```gdscript
+func grow() -> Board:
+	_carve()  # floor ringed by wall, a start, and a clearing around it
+	_river()  # water winding top to bottom, in the half the dragon faces, with bridges
+	_scatter()  # rock clusters and lava pools as short random walks over open floor
+	_verify()  # flood-fill from the start; floor it cannot reach becomes rock
+	return board
+```
+
+- **One seed, one map, one game.** The Wilds use the game's seed for the map too, so
+  the seed in the corner is all a friend needs: same map, same embers in the same
+  order. Retrying keeps the seed; N rolls a new one, D goes back to today's (the date
+  as a number, so everyone gets the same map today). A replay already stores the seed,
+  so replays of the Wilds needed no change beyond `load_level(seed)`.
+- **Same vocabulary as the drawn maps.** The generator only writes `Board.TILES`
+  kinds, so its rivers, bridges, rocks, and lava are drawn by the same kit and shaders.
+  `Level.to_text()` writes a grown map as a level file; a test reads it back with the
+  parser, so any seed you like can be saved into `levels/` and edited by hand.
+- **Fair by construction, then checked.** The steps never paint the clearing (three
+  moves around the start, the body, and a six-cell runway), and the river stays in
+  the far half. `verify` fills sealed pockets with rock rather than hoping there are
+  none. The tests then check 60 seeds the way `level_test.gd` checks drawn maps:
+  clear start, every ember spot reachable, every tile kind present, same seed same map.
+- **Order is part of the seed.** Every step draws from one `rng` in a fixed order, and
+  loops walk `Board.tiles` in insertion order, so moving a step, or adding one
+  anywhere but the end, changes every shared seed. Comparing two growths of a seed
+  cannot notice that, so `tests/golden-wilds.txt` holds seed 4821 as shipped (a golden
+  map, as `golden.replay` is a golden game).
+- **Rules that name no cells.** `wilds.rules` says hello, summons a rival at 4 embers,
+  and drops Haste now and then; `place` would be meaningless on a map no one drew.
+
+**Try it:** press 6 on the title banner for today's map, N for another, and note the
+seed in the corner. In the browser, `index.html?seed=4821` opens that map directly
+(natively: `godot -- --seed=4821`). Change `ROCKS` or `RIVER_WIDTH` at the top of
+`terrain.gd` and run `deno task test` to see the guarantees hold.
+
 ## Menu
 
 | Item | Group | Files |
@@ -338,5 +384,6 @@ browser, `user://` lives in IndexedDB).
 | Powerups | Systems | `core/powerup.gd`, `core/powerups/` |
 | Rival dragon | Systems | `core/controllers/`, `core/arena.gd`, `game/dragon_view.gd`, `tools/build_art.py` (`rival()`), `tests/rival_test.gd` |
 | Replays | Systems | `core/replay.gd`, `core/controllers/player_controller.gd`, `core/campaign.gd` (`Step.play`), `tests/replay_test.gd`, `tests/golden.replay` |
+| Procedural terrain | Content | `core/terrain.gd`, `core/campaign.gd` (`wilds`, `load_level`), `levels/wilds.rules`, `tests/terrain_test.gd`, `tests/golden-wilds.txt` |
 | Sound as code | Content | `tools/build_sfx.py`, `sfx/` |
 | Showcase art | Content | `tools/build_art.py`, `art/`, `game/stage.gd`, `game/effects.gd` |

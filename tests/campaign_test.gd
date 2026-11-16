@@ -62,6 +62,6 @@ func test_the_ember_trail_covers_every_level_in_order() -> void:
 		assert_true(name in maps)
 	assert_eq(maps[0], "meadow")
 	var last_goal := 0
-	for s in trail.steps:
+	for s in trail.steps.filter(func(s): return s.map != Terrain.NAME):  # the Wilds: endless
 		assert_true(s.goal > last_goal)
 		last_goal = s.goal

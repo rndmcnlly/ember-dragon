@@ -132,6 +132,25 @@ func _read_map(rows: Array, source: String) -> void:
 			return
 
 
+## The level as text that parse() reads back as the same level: how a grown map
+## (see Terrain) can be saved into levels/ and edited by hand.
+func to_text() -> String:
+	var symbols := {}
+	for symbol in LEGEND:
+		symbols[LEGEND[symbol]] = symbol
+	var lines := ["title: " + title, "blurb: " + blurb, ""]
+	for y in board.size.y:
+		var row := ""
+		for x in board.size.x:
+			var cell := Vector2i(x, y)
+			if cell == board.start:
+				row += STARTS.find_key(board.facing)
+			else:
+				row += symbols[board.kind_at(cell)]
+		lines.append(row)
+	return "\n".join(lines) + "\n"
+
+
 static func _legend() -> String:
 	var parts := []
 	for symbol in LEGEND:

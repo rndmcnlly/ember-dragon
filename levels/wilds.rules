@@ -1,0 +1,6 @@
+# wilds.rules: events for a grown map. No rule names a cell, because no one knows
+# where anything is until the seed says so.
+at tick 3: say "The Wilds: grown from the seed in the corner. Share it."
+at score 4: say "Something across the river smells the embers."
+at score 4: summon rival
+every 120 ticks: drop haste

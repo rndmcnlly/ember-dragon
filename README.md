@@ -29,6 +29,7 @@ on GitHub and deploys `dist/` to Pages.
 - `core/dragon.gd`: the dragon's rules on the grid (movement, a turn queue). No Nodes; tested headless.
 - `core/controllers/`: who steers a dragon: the keyboard, the rival's AI.
 - `core/replay.gd`: a recorded game (level, seed, turns per tick) and its playback.
+- `core/terrain.gd`: grows a map from a seed (river, rocks, lava), for the Wilds.
 - `levels/`: maps (`*.txt`), event scripts (`*.rules`), and the campaign that orders
   them (`campaign.gd`); `levels/README.md` is the legend and the rules reference.
 - `core/kit.gd`: which piece (head, straight, turn, tail) goes in each cell and how far to rotate it.

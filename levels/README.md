@@ -67,3 +67,9 @@ at score 11: place lava from 19,12 to 20,13
 
 Rules never put a wall or lava on the dragon or within three moves of its head,
 and never strand the ember on ground where it could not have appeared.
+
+## The Wilds
+
+The campaign's last step has no file here: `core/terrain.gd` grows its map from a
+seed, in the same tile kinds as the table above. `wilds.rules` scripts it, so its
+rules name no cells.

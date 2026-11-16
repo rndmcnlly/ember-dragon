@@ -11,4 +11,6 @@ static func ember_trail() -> Campaign:
 	trail.level("cinders").eat(10).without_pickups().with_rules("aftershocks")
 	trail.level("confluence").eat(12).with_pickups([GhostPowerup]).with_rival().with_rules("steam")
 	trail.level("caldera").eat(15).faster(1.15).with_rules("eruption")
-	return trail.then_any_other(Level.catalog())
+	trail.then_any_other(Level.catalog())
+	trail.wilds().with_rules("wilds")  # endless, on a map grown from a seed
+	return trail

@@ -14,7 +14,7 @@ extends RefCounted
 
 ## One level of the campaign: which map, and the knobs that tune it.
 class Step:
-	var map := ""  # a file in levels/, without .txt
+	var map := ""  # a file in levels/, without .txt; or Terrain.NAME for a grown map
 	var goal := 0  # embers to clear the level; 0 means fly for as long as you like
 	var pickups: Array[GDScript] = [HastePowerup, GhostPowerup, TrimPowerup]  # all, unless told
 	var tempo := 1.0  # the level's base speed; Haste and water multiply it
@@ -29,9 +29,12 @@ class Step:
 		if rival:
 			arena.summon_rival()
 
-	## This step's map from levels/. A broken file still gives a playable field (an
-	## empty one), with its errors listed so the game can show them.
-	func load_level() -> Level:
+	## This step's map, from one of two sources (Strategy): grown by Terrain from the
+	## game's seed, or read from levels/. A broken file still gives a playable field
+	## (an empty one), with its errors listed so the game can show them.
+	func load_level(seed := 0) -> Level:
+		if map == Terrain.NAME:
+			return Terrain.new(seed).level()
 		var level := Level.load_file("res://levels/%s.txt" % map)
 		if not level.errors.is_empty():
 			level.board = Board.bordered(Vector2i(42, 42))
@@ -101,6 +104,12 @@ func with_rules(file: String) -> Campaign:
 func with_rival() -> Campaign:
 	_latest().rival = true
 	return self
+
+
+## Start a step on a map grown from the game's seed (see Terrain): a new map for every
+## seed, the same map for the same seed. Tune it like any other step.
+func wilds() -> Campaign:
+	return level(Terrain.NAME)
 
 
 ## Add an endless step for every map not named yet, so a new levels/*.txt file
