@@ -53,7 +53,7 @@ joining the project.
 - **Data-driven:** `Kit.OPENINGS` says which sides each piece connects; one lookup
   picks the piece and rotation for every cell, so there is no case per corner.
 - **Game loop:** rules tick at a fixed rate (doubled by Haste) while drawing runs
-  every frame; the camera eases toward the head between ticks.
+  every frame; the camera eases toward the head (or both heads) between ticks.
 
 ## Decisions we argued about
 
@@ -271,6 +271,10 @@ var rival_next := rival.steer() if rival != null else NOWHERE
   builder and repaints its faces from `RIVAL_PALETTE` (obsidian scales, crimson belly
   and spikes, red eyes and flame), so `rival_head` and friends share every shape with
   the hero and no geometry is copied. `DragonView` draws either set, by name prefix.
+- **Both dragons on screen.** While a rival is alive the camera aims at the midpoint
+  of the two heads and backs off along the same angle as they part (`_follow` in
+  `game/main.gd`: one cell of pull per `CAMERA_FRAME` cells apart, clamped to
+  `CAMERA_MAX_PULL` so fog and shadows still reach). Alone, it rides the player's head.
 
 **Try it:** play The Ford (2) and eat three embers, or Fire Meets Water (4) from the
 start. Tempt the rival across your body, or let it grow and meet it head-on.

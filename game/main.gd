@@ -5,6 +5,8 @@ extends Node3D
 
 const TICK_SECONDS := 0.11
 const CAMERA_OFFSET := Vector3(0, 6, 5)
+const CAMERA_FRAME := 9.0  # dragons this many cells apart still fit the usual view
+const CAMERA_MAX_PULL := 2.5  # times the usual distance; fog and shadows end beyond it
 const REPLAY_PATH := "user://last.replay"  # in the browser, user:// lives in IndexedDB
 const DIRECTIONS := {
 	"ui_up": Vector2i.UP,
@@ -102,9 +104,9 @@ func _process(delta: float) -> void:
 	if arena.state != Arena.State.PLAYING or _replay_over():
 		_clock = 0.0
 	var head := hero.draw(arena.dragon.body, _progress(arena.dragon, period), delta, arena.ghost)
-	_draw_rival(_progress(arena.rival, period), delta)
+	var rival_head := _draw_rival(_progress(arena.rival, period), delta)
 	_draw_props(delta)
-	_follow(head, delta)
+	_follow(head, rival_head, delta)
 	_draw_hud()
 
 
@@ -273,12 +275,14 @@ func _progress(mover: Dragon, period: float) -> float:
 
 
 ## The rival may hatch, or crash, in any tick; the view follows whichever is current.
-func _draw_rival(t: float, delta: float) -> void:
+## Returns where its head is drawn, or the player's head when there is no rival.
+func _draw_rival(t: float, delta: float) -> Vector3:
 	if arena.rival != _rival_drawn:
 		_rival_drawn = arena.rival
 		rival.reset(arena.rival.body if arena.rival != null else [] as Array[Vector2i])
-	if arena.rival != null:
-		rival.draw(arena.rival.body, t, delta)
+	if arena.rival == null:
+		return _center(arena.dragon.body[0])
+	return rival.draw(arena.rival.body, t, delta)
 
 
 func _draw_props(delta: float) -> void:
@@ -292,11 +296,18 @@ func _draw_props(delta: float) -> void:
 	pickup_node.rotation.y += delta * 3
 
 
-## Ease toward the head between ticks; framerate-independent thanks to exp().
-func _follow(head: Vector3, delta: float) -> void:
-	var target := Vector3(head.x, 0, head.z) + CAMERA_OFFSET
+## Ease toward the head between ticks; framerate-independent thanks to exp(). With a
+## rival alive, aim between the two heads and back off as they part, so both stay on
+## screen; the same easing smooths the zoom when a rival hatches or falls.
+func _follow(head: Vector3, rival_head: Vector3, delta: float) -> void:
+	var focus := head
+	var pull := 1.0
+	if arena.rival != null:
+		focus = (head + rival_head) / 2
+		pull = clampf(head.distance_to(rival_head) / CAMERA_FRAME, 1.0, CAMERA_MAX_PULL)
+	var target := Vector3(focus.x, 0, focus.z) + CAMERA_OFFSET * pull
 	camera.position = camera.position.lerp(target, 1 - exp(-3 * delta))
-	camera.look_at(camera.position - CAMERA_OFFSET)
+	camera.look_at(camera.position - CAMERA_OFFSET)  # the same angle at any distance
 
 
 func _draw_hud() -> void:
