@@ -1,13 +1,17 @@
-# D4 reference solution (instructor only)
+# Ember Dragon
 
-Not for students. A worked example built from `../d4-dev`: the baseline plus every menu item.
-See DESIGN.md. The original starter README follows.
+**Play it: https://rndmcnlly.github.io/ember-dragon/**
 
----
+A finished version of the CMPM 121 (UC Santa Cruz, Fall 2026) D4 game: a dragon on a grid with
+snake rules, in Godot 4.7, with every model built by a Blender Python script. It grew from the
+[D4 starter](https://github.com/ucsc-cmpm-121-f26/d4-starter) and implements every optional
+requirement on the D4 menu, so course staff can point at a worked example of each one.
+`DESIGN.md` has a section per menu item: where it lives, which pattern it shows, how to try it.
+The commit history follows the build, one menu group at a time.
 
-
-A voxel dragon on a grid, snake rules: Godot and Blender, driven from text, with the same task
-habits as D3. The dragon moves and turns; food, growth, and collisions are yours to add.
+It is large and its parts lean on each other, so read it for ideas and techniques rather than
+lifting files. Students: your own project follows the course's AI and source-use policy; quote
+anything you borrow from here with a precise URL.
 
 | You want to | Run | What happens |
 | --- | --- | --- |
