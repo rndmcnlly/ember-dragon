@@ -3,7 +3,7 @@
 ## The world is built by game/stage.gd and the juice by game/effects.gd.
 extends Node3D
 
-const GRID := Vector2i(40, 40)
+const GRID := Vector2i(42, 42)  # a 40 by 40 field inside a ring of wall
 const TICK_SECONDS := 0.11
 const CAMERA_OFFSET := Vector3(0, 6, 5)
 const WAVE_HEIGHT := 0.06  # how far each segment rises and falls
@@ -16,6 +16,7 @@ const DIRECTIONS := {
 	"ui_right": Vector2i.RIGHT,
 }
 
+var board := Board.bordered(GRID)
 var arena: Arena
 var meshes := {}  # piece name -> Mesh, shared by every node that shows it (Flyweight)
 var sounds := {}  # sound name -> AudioStreamPlayer
@@ -35,7 +36,7 @@ var _head_yaw := 0.0
 func _ready() -> void:
 	_load_meshes()
 	_load_sounds()
-	add_child(Stage.new(_board(), meshes))
+	add_child(Stage.new(board.tiles, meshes))
 	_build_props()
 	_build_hud()
 	_new_game()
@@ -70,7 +71,7 @@ func _process(delta: float) -> void:
 
 
 func _new_game() -> void:
-	arena = Arena.new(GRID, randi())
+	arena = Arena.new(board, randi())
 	arena.ate.connect(func(_cell): sounds["eat"].play())
 	arena.powered.connect(func(_powerup): sounds["power"].play())
 	arena.died.connect(func(_reason): sounds["crash"].play())
@@ -99,17 +100,6 @@ func _use_vertex_colors(mesh: Mesh) -> void:
 		var material := mesh.surface_get_material(surface) as BaseMaterial3D
 		if material and mesh.surface_get_arrays(surface)[Mesh.ARRAY_COLOR] != null:
 			material.vertex_color_use_as_albedo = true
-
-
-## The kind of tile in each cell: floor inside the arena, a ring of wall around it.
-## Drawn up here for now; later it can become rules data (lava, water, bridges).
-func _board() -> Dictionary:
-	var board := {}
-	for x in range(-1, GRID.x + 1):
-		for y in range(-1, GRID.y + 1):
-			var inside := Rect2i(Vector2i.ZERO, GRID).has_point(Vector2i(x, y))
-			board[Vector2i(x, y)] = "floor" if inside else "wall"
-	return board
 
 
 ## sfx/*.wav come from tools/build_sfx.py.

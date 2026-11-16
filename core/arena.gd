@@ -14,7 +14,7 @@ const PICKUP_CHANCE := 0.3  # chance that eating spawns a powerup pickup
 
 ## Add a Powerup subclass here and it can appear on the board.
 var pickup_kinds: Array[GDScript] = [HastePowerup, GhostPowerup, TrimPowerup]
-var size: Vector2i
+var board: Board
 var dragon: Dragon
 var food: Vector2i
 var pickup: Powerup = null  # waiting on the board at pickup_cell
@@ -28,10 +28,10 @@ var ghost := false  # GhostPowerup lets the head pass through the body
 var rng := RandomNumberGenerator.new()
 
 
-func _init(grid_size: Vector2i, seed := 0) -> void:
-	size = grid_size
+func _init(ground: Board, seed := 0) -> void:
+	board = ground
 	rng.seed = seed
-	dragon = Dragon.new(grid_size / 2)
+	dragon = Dragon.new(board.size / 2)
 	food = _empty_cell()
 
 
@@ -45,7 +45,7 @@ func tick() -> void:
 	if state != State.PLAYING:
 		return
 	var next := dragon.steer()
-	if not Rect2i(Vector2i.ZERO, size).has_point(next):
+	if board.is_solid(next):
 		_die("the wall")
 		return
 	if dragon.blocks(next) and not ghost:
@@ -95,9 +95,13 @@ func _die(reason: String) -> void:
 	died.emit(reason)
 
 
+## A random cell where food or a pickup may appear: open ground with nothing on it.
 func _empty_cell() -> Vector2i:
 	while true:
-		var cell := Vector2i(rng.randi_range(0, size.x - 1), rng.randi_range(0, size.y - 1))
-		if not dragon.body.has(cell) and cell != food and cell != pickup_cell:
+		var cell := Vector2i(
+			rng.randi_range(0, board.size.x - 1), rng.randi_range(0, board.size.y - 1)
+		)
+		var taken := dragon.body.has(cell) or cell == food or cell == pickup_cell
+		if not taken and not board.is_solid(cell):
 			return cell
 	return Vector2i.ZERO

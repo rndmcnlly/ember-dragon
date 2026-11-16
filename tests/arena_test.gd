@@ -1,10 +1,11 @@
 extends "res://tests/test_case.gd"
 
-const SIZE := Vector2i(10, 10)
+const SIZE := Vector2i(12, 12)
+var board := Board.bordered(SIZE)  # walls on the edge, floor from (1, 1) to (10, 10)
 
 
 func test_waits_for_the_first_move() -> void:
-	var arena := Arena.new(SIZE)
+	var arena := Arena.new(board)
 	var head := arena.dragon.body[0]
 	arena.tick()
 	assert_eq(arena.dragon.body[0], head)
@@ -27,6 +28,19 @@ func test_the_wall_ends_the_game() -> void:
 		arena.tick()
 	assert_eq(arena.state, Arena.State.OVER)
 	assert_eq(arena.death, "the wall")
+
+
+func test_a_wall_inside_the_board_ends_the_game() -> void:
+	var arena := _started()
+	arena.board.tiles[arena.dragon.body[0] + Vector2i.RIGHT] = "wall"
+	arena.tick()
+	assert_eq(arena.death, "the wall")
+
+
+func test_food_never_lands_on_a_wall() -> void:
+	for seed in 50:
+		var arena := Arena.new(Board.bordered(SIZE), seed)
+		assert_true(not arena.board.is_solid(arena.food))
 
 
 func test_biting_the_body_ends_the_game() -> void:
@@ -62,7 +76,7 @@ func test_haste_wears_off() -> void:
 
 
 func test_same_seed_same_food() -> void:
-	assert_eq(Arena.new(SIZE, 121).food, Arena.new(SIZE, 121).food)
+	assert_eq(Arena.new(board, 121).food, Arena.new(board, 121).food)
 
 
 ## A dragon curled so that heading left from (5, 5) runs into (4, 5).
@@ -82,6 +96,6 @@ func _coiled(away_from_food: Vector2i) -> Arena:
 
 
 func _started() -> Arena:
-	var arena := Arena.new(SIZE)
+	var arena := Arena.new(board)
 	arena.start()
 	return arena

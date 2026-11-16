@@ -9,6 +9,8 @@ joining the project.
 | Word | Meaning | In code |
 | --- | --- | --- |
 | cell | one square of the grid | `Vector2i` |
+| board | the ground: one tile kind per cell | `Board.tiles` |
+| tile kind | what a cell is made of ("floor", "wall"), and what that means to the rules | `Board.TILES` |
 | tick | one step of the rules; the dragon moves one cell | `Arena.tick()` |
 | body | the dragon's cells, head first | `Dragon.body` |
 | piece | one of the kit's models: head, straight, turn, tail | `Kit.Piece` |
@@ -35,6 +37,9 @@ joining the project.
 - **Strategy:** each `Powerup` subclass changes the arena its own way. A new one is
   a new file plus one line in `Arena.pickup_kinds`; no `match` on powerup names.
 - **Flyweight:** every segment shares one of four meshes.
+- **Type Object:** `Board.TILES` says what each tile kind means (`solid` or not).
+  The Arena asks `board.is_solid(cell)`, never "is this a wall?", so a new kind of
+  ground is a new row there plus a builder of the same name in `build_art.py`.
 - **Data-driven:** `Kit.OPENINGS` says which sides each piece connects; one lookup
   picks the piece and rotation for every cell, so there is no case per corner.
 - **Game loop:** rules tick at a fixed rate (doubled by Haste) while drawing runs
@@ -66,8 +71,9 @@ The adapter is now three files: `game/main.gd` (loop, input, dragon, HUD),
   depth fog in the horizon color hides the edge of the world, and glow with a
   threshold of 0.85 makes only emissive things bloom. The web renderer's color
   buffer is low dynamic range, so that threshold was tuned by eye, not by physics.
-- **The board is data:** `_board()` maps each cell to a kind name ("floor", "wall"),
-  and the Stage draws each kind as one MultiMesh, with a kit mesh of the same name.
+- **The board is data:** `core/board.gd` maps each cell to a kind name ("floor",
+  "wall"); the Arena collides with it and the Stage draws each kind as one
+  MultiMesh, with a kit mesh of the same name.
   A missing mesh becomes a plain box (magenta for unknown kinds), never a crash.
 - **Smooth motion without changing the rules:** the rules still jump one cell per
   tick. Between ticks only the ends of the body move (the head slides out of the
