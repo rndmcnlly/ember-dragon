@@ -8,9 +8,9 @@ func _init() -> void:
 	duration = 60
 
 
-func start(arena: Arena) -> void:
-	arena.speed = 2.0
+func start(session: Session) -> void:
+	session.speed = 2.0
 
 
-func finish(arena: Arena) -> void:
-	arena.speed = 1.0
+func finish(session: Session) -> void:
+	session.speed = 1.0

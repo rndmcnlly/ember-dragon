@@ -16,35 +16,35 @@ func test_each_level_call_starts_a_step_and_the_rest_tune_it() -> void:
 	assert_eq(trial.steps[1].pickups, [HastePowerup] as Array[GDScript])
 
 
-func test_a_step_tunes_its_arena() -> void:
+func test_a_step_tunes_its_session() -> void:
 	var trial := Campaign.new()
 	trial.level("meadow").eat(2).without_pickups().faster(1.25)
-	var arena := Arena.new(Board.bordered(Vector2i(12, 12)))
-	trial.steps[0].prepare(arena)
-	assert_eq(arena.goal, 2)
-	assert_eq(arena.pickup_kinds.size(), 0)
-	assert_eq(arena.pace(), 1.25)
+	var session := Session.new(Board.bordered(Vector2i(12, 12)))
+	trial.steps[0].prepare(session)
+	assert_eq(session.goal, 2)
+	assert_eq(session.pickup_kinds.size(), 0)
+	assert_eq(session.pace(), 1.25)
 
 
 func test_reaching_the_goal_clears_the_level() -> void:
-	var arena := Arena.new(Board.bordered(Vector2i(12, 12)))
+	var session := Session.new(Board.bordered(Vector2i(12, 12)))
 	var cleared := []
-	arena.won.connect(func(): cleared.append(true))
-	arena.goal = 1
-	arena.start()
-	arena.food = arena.dragon.body[0] + Vector2i.RIGHT
-	arena.tick()
-	assert_eq(arena.state, Arena.State.WON)
+	session.won.connect(func(): cleared.append(true))
+	session.goal = 1
+	session.start()
+	session.food = session.dragon.body[0] + Vector2i.RIGHT
+	session.tick()
+	assert_eq(session.state, Session.State.WON)
 	assert_eq(cleared.size(), 1)
 
 
 func test_without_pickups_none_ever_appear() -> void:
-	var arena := Arena.new(Board.bordered(Vector2i(12, 12)), 7)
-	arena.pickup_kinds = []
-	arena.start()
+	var session := Session.new(Board.bordered(Vector2i(12, 12)), 7)
+	session.pickup_kinds = []
+	session.start()
 	for i in 20:
-		arena._eat()
-	assert_eq(arena.pickup, null)
+		session._eat()
+	assert_eq(session.pickup, null)
 
 
 func test_unnamed_maps_join_at_the_end() -> void:

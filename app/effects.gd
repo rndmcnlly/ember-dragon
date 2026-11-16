@@ -1,5 +1,5 @@
 ## Juice: sparks, screen flashes, camera shake, slow motion. It only listens to the
-## Arena's signals (Observer), so the rules never know any of this exists, and
+## Session's signals (Observer), so the rules never know any of this exists, and
 ## deleting this file leaves a working, quieter game.
 class_name Effects
 extends Node3D
@@ -13,7 +13,7 @@ const TILE_SPARKS := {"lava": EMBER, "water": Color(0.45, 0.75, 1.0), "wall": Co
 const MAX_SHAKE := 0.5  # camera offset in meters at full trauma
 
 var camera: Camera3D
-var arena: Arena  # the game being watched; listeners read it here, never capture it
+var session: Session  # the one being watched; listeners read it here, never capture it
 var _trauma := 0.0  # 0..1; the shake grows with its square, so small bumps stay subtle
 var _flash := ColorRect.new()
 var _sparks := {}  # color -> Mesh, one glowing cube per color shared by every burst
@@ -29,44 +29,44 @@ func _init(follow: Camera3D) -> void:
 	add_child(layer)
 
 
-## Subscribe to a new game's Arena. The listeners reach the Arena through this node's
-## arena field instead of capturing it: a lambda that captures the Arena it listens to
-## is a cycle (Arena, signal, lambda, Arena) that RefCounted never frees, so every
-## finished game used to stay in memory. Capturing self, a Node, makes no cycle.
-func watch(game: Arena) -> void:
-	arena = game
-	game.ate.connect(func(cell): _burst(_center(cell), EMBER, 24, 4.0))
-	game.rival_ate.connect(func(cell): _burst(_center(cell), CRIMSON, 24, 4.0))
-	game.powered.connect(
+## Subscribe to a new Session. The listeners reach the Session through this node's
+## session field instead of capturing it: a lambda that captures the Session it listens to
+## is a cycle (Session, signal, lambda, Session) that RefCounted never frees, so every
+## finished session used to stay in memory. Capturing self, a Node, makes no cycle.
+func watch(next: Session) -> void:
+	session = next
+	next.ate.connect(func(cell): _burst(_center(cell), EMBER, 24, 4.0))
+	next.rival_ate.connect(func(cell): _burst(_center(cell), CRIMSON, 24, 4.0))
+	next.powered.connect(
 		func(_powerup):
-			_burst(_center(arena.dragon.body[0]), ARCANE, 40, 6.0)
+			_burst(_center(session.dragon.body[0]), ARCANE, 40, 6.0)
 			_flash_screen(ARCANE, 0.25)
 	)
 	# Rules changed the ground: a puff where a few tiles changed, a flash when many did.
-	game.board.changed.connect(
+	next.board.changed.connect(
 		func(cells):
-			var color: Color = TILE_SPARKS.get(arena.board.kind_at(cells[0]), GOLD)
+			var color: Color = TILE_SPARKS.get(session.board.kind_at(cells[0]), GOLD)
 			if cells.size() > 6:
 				_flash_screen(color, 0.3)
 				return
 			for cell in cells:
 				_burst(_center(cell), color, 14, 3.0)
 	)
-	game.won.connect(
+	next.won.connect(
 		func():
-			_burst(_center(arena.dragon.body[0]), GOLD, 90, 8.0)
+			_burst(_center(session.dragon.body[0]), GOLD, 90, 8.0)
 			_flash_screen(GOLD, 0.3)
 	)
-	game.died.connect(
+	next.died.connect(
 		func(_reason):
-			var heading := arena.dragon.heading
-			var impact := _center(arena.dragon.body[0]) + Vector3(heading.x, 0, heading.y) * 0.5
+			var heading := session.dragon.heading
+			var impact := _center(session.dragon.body[0]) + Vector3(heading.x, 0, heading.y) * 0.5
 			_burst(impact, BLOOD, 60, 7.0)
 			_flash_screen(BLOOD, 0.35)
 			_trauma = 1.0
 			_slow_motion(0.25, 0.6)
 	)
-	game.rival_crashed.connect(
+	next.rival_crashed.connect(
 		func(cell):
 			_burst(_center(cell), CRIMSON, 70, 7.0)
 			_trauma = maxf(_trauma, 0.6)

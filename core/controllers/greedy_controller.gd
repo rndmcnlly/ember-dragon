@@ -6,7 +6,7 @@
 ##   - avoid cells a head-on bump could happen in, unless it is the longer dragon;
 ##   - then, closest to the ember as the crow flies (not by path, so walls and rivers
 ##     fool it, which is what makes it beatable).
-## It reads the Arena and never rolls dice, so the same game always plays out the same
+## It reads the Session and never rolls dice, so the same session always plays out the same
 ## way, which is what lets a replay record only the player's keys.
 class_name GreedyController
 extends Controller
@@ -15,7 +15,7 @@ const TRAPPED := -1000  # a move into a pocket too small for the body
 const RISKY := -500  # a move the other dragon's head could also take
 
 
-func steer(arena: Arena, dragon: Dragon) -> void:
+func steer(session: Session, dragon: Dragon) -> void:
 	var best := dragon.heading
 	var best_score := -INF
 	# Straight first: on a tie it keeps going, which looks calmer than zig-zagging.
@@ -23,13 +23,13 @@ func steer(arena: Arena, dragon: Dragon) -> void:
 		dragon.heading, Kit.quarter_turn(dragon.heading), -Kit.quarter_turn(dragon.heading)
 	]:
 		var cell: Vector2i = dragon.body[0] + direction
-		if arena.crashes(dragon, cell):
+		if session.crashes(dragon, cell):
 			continue
-		var score := -float(_distance(cell, arena.food))
-		var room := _room(arena, cell, dragon.body.size())
+		var score := -float(_distance(cell, session.food))
+		var room := _room(session, cell, dragon.body.size())
 		if room < dragon.body.size():
 			score += TRAPPED + room  # if every way is a trap, pick the roomiest
-		var other := arena.opponent(dragon)
+		var other := session.opponent(dragon)
 		if other != null and other.body.size() >= dragon.body.size():
 			if _distance(cell, other.body[0]) == 1:
 				score += RISKY
@@ -42,14 +42,14 @@ func steer(arena: Arena, dragon: Dragon) -> void:
 
 ## How many cells are open from here, counting up to enough. Both bodies count as
 ## walls, which is cautious: tails move away, but not before the head gets there.
-func _room(arena: Arena, from: Vector2i, enough: int) -> int:
+func _room(session: Session, from: Vector2i, enough: int) -> int:
 	var seen := {from: true}
 	var frontier: Array[Vector2i] = [from]
 	while not frontier.is_empty() and seen.size() < enough:
 		var cell: Vector2i = frontier.pop_back()
 		for step in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 			var next: Vector2i = cell + step
-			if not seen.has(next) and arena.is_open(next):
+			if not seen.has(next) and session.is_open(next):
 				seen[next] = true
 				frontier.append(next)
 	return seen.size()

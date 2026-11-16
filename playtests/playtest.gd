@@ -13,7 +13,7 @@ const LINGER := 45  # frames to keep recording after the end, for the result ban
 const MAX_SNAPS := 10  # a handful: the start, the events, three progress shots, the end
 
 var plan: Replay
-var arena: Arena
+var session: Session
 var notes: PlaytestLog
 var level_title := ""
 var out := ""  # the evidence folder
@@ -47,26 +47,26 @@ func _ready() -> void:
 	if game.watching != plan:
 		_fail()
 		return
-	arena = game.arena
+	session = game.session
 	level_title = game.level.title
-	notes = PlaytestLog.new(arena, plan, text, level_title)
+	notes = PlaytestLog.new(session, plan, text, level_title)
 	_progress = [plan.ticks / 4, plan.ticks / 2, plan.ticks * 3 / 4]
 
 
 ## The rules alone, as fast as they run: no window, no movie, no snapshots.
 func _dry_run(text: String) -> void:
 	var campaign: Campaign = TRAIL.ember_trail()
-	arena = plan.restage(campaign) if plan.errors.is_empty() else null
-	if arena == null:
+	session = plan.restage(campaign) if plan.errors.is_empty() else null
+	if session == null:
 		_fail()
 		return
 	level_title = campaign.steps[plan.level - 1].load_level(plan.seed).title
-	notes = PlaytestLog.new(arena, plan, text, level_title)
+	notes = PlaytestLog.new(session, plan, text, level_title)
 	notes.play_out()
 	_finish()
 
 
-## Runs only while recording: the game ticks itself (game/main.gd); we watch the clock.
+## Runs only while recording: the game ticks itself (app/main.gd); we watch the clock.
 func _process(_delta: float) -> void:
 	if notes == null or _ended:
 		return
@@ -78,12 +78,12 @@ func _process(_delta: float) -> void:
 			continue  # one picture per tick, named for its first event
 		var delay := SNAP_DELAY if moment[0] > 0 else 0  # the start, before the first move
 		_plan_snap(_frame + delay, "tick-%04d-%s" % moment)
-	if not _progress.is_empty() and arena.ticks >= _progress[0]:
+	if not _progress.is_empty() and session.ticks >= _progress[0]:
 		_plan_snap(_frame, "tick-%04d-progress" % _progress.pop_front())
-	if arena.state != Arena.State.PLAYING or arena.ticks >= plan.ticks:
+	if session.state != Session.State.PLAYING or session.ticks >= plan.ticks:
 		_ended = true
 		notes.finish()  # the dry run's play_out() calls it too
-		_plan_snap(_frame + LINGER, "tick-%04d-end" % arena.ticks, true)
+		_plan_snap(_frame + LINGER, "tick-%04d-end" % session.ticks, true)
 	for label in _queue.get(_frame, []):
 		_snap(label)
 
@@ -142,9 +142,9 @@ func _summary() -> Array[String]:
 	lines.append("Level      %d %s (%s), seed %d" % [plan.level, plan.map, level_title, plan.seed])
 	lines.append("Plan       %d ticks, turns on %d of them" % [plan.ticks, plan.turns.size()])
 	lines.append("Ending     %s" % notes.ending)
-	var goal := " of %d to clear" % arena.goal if arena.goal > 0 else ""
+	var goal := " of %d to clear" % session.goal if session.goal > 0 else ""
 	lines.append(
-		"Score      %d embers%s, length %d" % [arena.score, goal, arena.dragon.body.size()]
+		"Score      %d embers%s, length %d" % [session.score, goal, session.dragon.body.size()]
 	)
 	lines.append("Rival      %s" % _rival())
 	var counted: Array[String] = []
@@ -169,10 +169,10 @@ func _summary() -> Array[String]:
 
 
 func _rival() -> String:
-	if arena.rival != null:
-		return "alive, %d embers" % arena.rival_score
+	if session.rival != null:
+		return "alive, %d embers" % session.rival_score
 	if notes.counts.has("rival"):
-		return "crashed, after %d embers" % arena.rival_score
+		return "crashed, after %d embers" % session.rival_score
 	return "none"
 
 

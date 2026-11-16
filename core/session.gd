@@ -1,6 +1,6 @@
-## One game: the board, the rules, and the score. No Nodes; the engine only
+## One run at one level: the board, the rules, and the score. No Nodes; the engine only
 ## listens to these signals (Observer) and reads the state to draw it.
-class_name Arena
+class_name Session
 extends RefCounted
 
 signal ate(cell: Vector2i)
@@ -23,7 +23,7 @@ const NOWHERE := Vector2i(-1000, -1000)  # the next cell of a dragon that is not
 var pickup_kinds: Array[GDScript] = [HastePowerup, GhostPowerup, TrimPowerup]
 var board: Board
 var dragon: Dragon  # the player's
-var controller: Controller = Controller.new()  # steers it; game/main.gd sets a PlayerController
+var controller: Controller = Controller.new()  # steers it; app/main.gd sets a PlayerController
 var rival: Dragon = null  # a second dragon, once a level summons one; null again if it crashes
 var rival_controller: Controller = null
 var rival_score := 0
@@ -85,7 +85,7 @@ func start() -> void:
 func tick() -> void:
 	if state != State.PLAYING:
 		return
-	ticks += 1  # first, so the tick that ends the game counts too
+	ticks += 1  # first, so the tick that ends the session counts too
 	var moves := _stride(dragon)
 	var rival_moves := rival != null and _stride(rival)
 	if moves:

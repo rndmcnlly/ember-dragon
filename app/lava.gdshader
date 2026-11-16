@@ -1,6 +1,6 @@
 // Molten rock under a cracked crust. Blender's "Lava" material supplies the colors; this adds
 // motion with a few sine waves in world space, so neighboring tiles flow as one pool
-// and no texture is needed. game/stage.gd swaps it in by the material's name.
+// and no texture is needed. app/stage.gd swaps it in by the material's name.
 shader_type spatial;
 
 uniform vec3 albedo : source_color = vec3(1.0, 0.4, 0.1);

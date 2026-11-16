@@ -68,26 +68,26 @@ func test_a_grown_map_is_a_valid_level_file() -> void:
 
 
 ## The campaign's Wilds step grows its map from the game's seed, so a replay (level,
-## seed, turns) regrows the same map before it replays the same game.
+## seed, turns) regrows the same map before it replays the same session.
 func test_the_wilds_step_and_its_replays_grow_from_the_seed() -> void:
 	var trail: Campaign = TRAIL.ember_trail()
 	var wilds := trail.steps.map(func(s): return s.map).find(Terrain.NAME)
 	assert_true(wilds >= 0)
 	var replay := Replay.parse("level: %d wilds\nseed: 4821\nticks: 1" % (wilds + 1))
-	var arena := replay.run(trail)
-	assert_eq(arena.board.tiles, Terrain.new(4821).grow().tiles)
+	var session := replay.run(trail)
+	assert_eq(session.board.tiles, Terrain.new(4821).grow().tiles)
 
 
 ## Two AIs fly grown maps for a while: they behave as on drawn maps, rival and all.
 func test_two_ais_fly_grown_maps() -> void:
 	for seed in 5:
-		var arena := Arena.new(Terrain.new(seed).grow(), seed)
-		arena.controller = GreedyController.new()
-		assert_true(arena.summon_rival())
-		arena.start()
+		var session := Session.new(Terrain.new(seed).grow(), seed)
+		session.controller = GreedyController.new()
+		assert_true(session.summon_rival())
+		session.start()
 		for i in 200:
-			arena.tick()
-		assert_true(arena.ticks > 20)  # nobody crashed at the first wall
+			session.tick()
+		assert_true(session.ticks > 20)  # nobody crashed at the first wall
 
 
 func _expect_floor(board: Board, cell: Vector2i, seed: int) -> void:

@@ -1,8 +1,8 @@
-## The player's controller. game/main.gd forwards each arrow key with press(); the
+## The player's controller. app/main.gd forwards each arrow key with press(); the
 ## turns wait here until the next tick, then go to the dragon in the order pressed,
 ## so two quick taps between ticks are still two turns (Command). Because commands
 ## only take effect on ticks, writing down which tick each went to records the whole
-## game (see Replay).
+## session (see Replay).
 class_name PlayerController
 extends Controller
 
@@ -14,10 +14,10 @@ func press(direction: Vector2i) -> void:
 	pending.append(direction)
 
 
-func steer(arena: Arena, dragon: Dragon) -> void:
+func steer(session: Session, dragon: Dragon) -> void:
 	if pending.is_empty():
 		return
-	log[arena.ticks] = pending.duplicate()
+	log[session.ticks] = pending.duplicate()
 	for direction in pending:
 		dragon.turn(direction)
 	pending.clear()

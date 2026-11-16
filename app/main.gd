@@ -1,6 +1,6 @@
-## Engine adapter: stages the Arena in 3D, plays its sounds, and shows the score.
+## Engine adapter: stages the Session in 3D, plays its sounds, and shows the score.
 ## All rules live in core/; this file only turns state into pictures and sound.
-## The world is built by game/stage.gd and the juice by game/effects.gd.
+## The world is built by app/stage.gd and the juice by app/effects.gd.
 extends Node3D
 
 const TICK_SECONDS := 0.11
@@ -20,9 +20,9 @@ var step: Campaign.Step  # where we are in the campaign
 var level: Level  # that step's map
 var problems: Array[String] = []  # mistakes in the level or rules file, shown on the banner
 var wild_seed := 0  # the seed the Wilds grow from: today's, a shared one, or a new roll
-var arena: Arena
-var player: PlayerController  # this game's keyboard controller; arrow keys go here
-var tape: Replay  # the player's current or last game, recorded as it is played
+var session: Session
+var player: PlayerController  # this session's keyboard controller; arrow keys go here
+var tape: Replay  # the player's current or last session, recorded as it is played
 var watching: Replay = null  # the replay on screen, if one is playing back
 var stage: Stage
 var meshes := {}  # piece name -> Mesh, shared by every node that shows it (Flyweight)
@@ -60,7 +60,7 @@ func _ready() -> void:
 
 ## Input arrives as events, so even a tap shorter than one frame is never missed.
 func _unhandled_input(event: InputEvent) -> void:
-	var paused := arena.state != Arena.State.PLAYING or _replay_over()
+	var paused := session.state != Session.State.PLAYING or _replay_over()
 	if paused and event is InputEventKey and event.pressed:
 		var choice: int = event.keycode - KEY_1  # number keys pick a level
 		if choice >= 0 and choice < mini(campaign.steps.size(), 9):
@@ -71,7 +71,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if _growing() and event.keycode in [KEY_N, KEY_D]:  # another map, or today's
 			wild_seed = randi_range(1, 99999) if event.keycode == KEY_N else _daily_seed()
-			_new_game()
+			_new_session()
 			return
 		if event.keycode == KEY_S and tape.ticks > 0:
 			var saved := tape.save(REPLAY_PATH)
@@ -81,37 +81,39 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("ui_accept"):
 			_load_level(tape.level - 1)
 		return
-	if arena.state == Arena.State.OVER or arena.state == Arena.State.WON:
-		if event.is_action_pressed("ui_accept") and arena.state == Arena.State.WON:
+	if session.state == Session.State.OVER or session.state == Session.State.WON:
+		if event.is_action_pressed("ui_accept") and session.state == Session.State.WON:
 			_load_level(_number() % campaign.steps.size())  # the next level, or the first again
 		elif event.is_action_pressed("ui_accept"):
-			_new_game()
+			_new_session()
 		return
 	for action in DIRECTIONS:
 		if event.is_action_pressed(action):
-			arena.start()
+			session.start()
 			player.press(DIRECTIONS[action])
 
 
 ## Rules tick at a fixed rate; drawing happens every frame, between ticks too.
 func _process(delta: float) -> void:
-	var period := TICK_SECONDS / arena.pace()
+	var period := TICK_SECONDS / session.pace()
 	_clock += delta
-	while _clock >= period and arena.state == Arena.State.PLAYING:
+	while _clock >= period and session.state == Session.State.PLAYING:
 		_clock -= period
-		if arena.will_move(arena.dragon):  # a wading dragon keeps sliding toward its last move
-			hero.before_tick(arena.dragon.body)
-		if arena.rival != null and arena.will_move(arena.rival):
-			rival.before_tick(arena.rival.body)
-		arena.tick()
+		if session.will_move(session.dragon):  # a wading dragon keeps sliding toward its last move
+			hero.before_tick(session.dragon.body)
+		if session.rival != null and session.will_move(session.rival):
+			rival.before_tick(session.rival.body)
+		session.tick()
 		if watching == null:
-			tape.ticks = arena.ticks
+			tape.ticks = session.ticks
 		elif _replay_over():
 			break
-	if arena.state != Arena.State.PLAYING or _replay_over():
+	if session.state != Session.State.PLAYING or _replay_over():
 		_clock = 0.0
-	var head := hero.draw(arena.dragon.body, _progress(arena.dragon, period), delta, arena.ghost)
-	var rival_head := _draw_rival(_progress(arena.rival, period), delta)
+	var head := hero.draw(
+		session.dragon.body, _progress(session.dragon, period), delta, session.ghost
+	)
+	var rival_head := _draw_rival(_progress(session.rival, period), delta)
 	_draw_props(delta)
 	_follow(head, rival_head, delta)
 	_draw_hud()
@@ -119,14 +121,14 @@ func _process(delta: float) -> void:
 
 func _load_level(index: int) -> void:
 	step = campaign.steps[index]
-	_new_game()
+	_new_session()
 
 
-## A fresh game of this step, recorded from the first key. Its map and rules are read
+## A fresh session of this step, recorded from the first key. Its map and rules are read
 ## fresh, so a fixed typo shows on the next try; a broken file still gives a playable
 ## field, with its errors on screen. A grown map keeps its seed from try to try (the
 ## seed is the map); a drawn one rolls a new seed each time.
-func _new_game() -> void:
+func _new_session() -> void:
 	var seed := wild_seed if _growing() else randi()
 	level = step.load_level(seed)
 	problems = level.errors.duplicate()
@@ -141,7 +143,7 @@ func _new_game() -> void:
 	player = PlayerController.new()
 	tape.turns = player.log  # the same Dictionary: the controller writes, the tape keeps
 	_show(step.play(level, tape.seed))
-	arena.controller = player
+	session.controller = player
 
 
 ## Play a recording back, through the same rules, from the same seed.
@@ -156,23 +158,23 @@ func watch(replay: Replay) -> void:
 	_show(restaged)
 
 
-## Draw a new Arena and listen to it.
-func _show(game: Arena) -> void:
-	arena = game
-	stage.draw_board(arena.board)
-	arena.announced.connect(_announce)
+## Draw a new Session and listen to it.
+func _show(next: Session) -> void:
+	session = next
+	stage.draw_board(session.board)
+	session.announced.connect(_announce)
 	notice.modulate.a = 0.0
-	arena.ate.connect(func(_cell): sounds["eat"].play())
-	arena.powered.connect(func(_powerup): sounds["power"].play())
-	arena.died.connect(func(_reason): sounds["crash"].play())
-	arena.won.connect(func(): sounds["power"].play())
-	arena.rival_ate.connect(func(_cell): sounds["rival_eat"].play())
-	arena.rival_crashed.connect(func(_cell): sounds["crash"].play())
-	effects.watch(arena)
+	session.ate.connect(func(_cell): sounds["eat"].play())
+	session.powered.connect(func(_powerup): sounds["power"].play())
+	session.died.connect(func(_reason): sounds["crash"].play())
+	session.won.connect(func(): sounds["power"].play())
+	session.rival_ate.connect(func(_cell): sounds["rival_eat"].play())
+	session.rival_crashed.connect(func(_cell): sounds["crash"].play())
+	effects.watch(session)
 	_clock = 0.0
-	hero.reset(arena.dragon.body)
+	hero.reset(session.dragon.body)
 	_draw_rival(0.0, 0.0)
-	camera.position = _center(arena.dragon.body[0]) + CAMERA_OFFSET
+	camera.position = _center(session.dragon.body[0]) + CAMERA_OFFSET
 
 
 ## art/dragon_kit.glb holds one object per piece: head, straight, turn, tail, food,
@@ -280,28 +282,28 @@ func _announce(text: String) -> void:
 func _progress(mover: Dragon, period: float) -> float:
 	if mover == null:
 		return 0.0
-	return minf(mover.stride + _clock / period * arena.board.pace_at(mover.body[0]), 1.0)
+	return minf(mover.stride + _clock / period * session.board.pace_at(mover.body[0]), 1.0)
 
 
 ## The rival may hatch, or crash, in any tick; the view follows whichever is current.
 ## Returns where its head is drawn, or the player's head when there is no rival.
 func _draw_rival(t: float, delta: float) -> Vector3:
-	if arena.rival != _rival_drawn:
-		_rival_drawn = arena.rival
-		rival.reset(arena.rival.body if arena.rival != null else [] as Array[Vector2i])
-	if arena.rival == null:
-		return _center(arena.dragon.body[0])
-	return rival.draw(arena.rival.body, t, delta)
+	if session.rival != _rival_drawn:
+		_rival_drawn = session.rival
+		rival.reset(session.rival.body if session.rival != null else [] as Array[Vector2i])
+	if session.rival == null:
+		return _center(session.dragon.body[0])
+	return rival.draw(session.rival.body, t, delta)
 
 
 func _draw_props(delta: float) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
-	food_node.position = _center(arena.food) + Vector3.UP * (0.08 + 0.06 * sin(now * 3))
+	food_node.position = _center(session.food) + Vector3.UP * (0.08 + 0.06 * sin(now * 3))
 	food_node.rotation.y += delta * 2
 	# Two sines at odd ratios read as a flicker without any randomness.
 	ember_light.light_energy = 1.8 + 0.35 * sin(now * 13) * sin(now * 7.3)
-	pickup_node.visible = arena.pickup != null
-	pickup_node.position = _center(arena.pickup_cell) + Vector3.UP * (0.2 + 0.15 * sin(now * 5))
+	pickup_node.visible = session.pickup != null
+	pickup_node.position = _center(session.pickup_cell) + Vector3.UP * (0.2 + 0.15 * sin(now * 5))
 	pickup_node.rotation.y += delta * 3
 
 
@@ -311,7 +313,7 @@ func _draw_props(delta: float) -> void:
 func _follow(head: Vector3, rival_head: Vector3, delta: float) -> void:
 	var focus := head
 	var pull := 1.0
-	if arena.rival != null:
+	if session.rival != null:
 		focus = (head + rival_head) / 2
 		pull = clampf(head.distance_to(rival_head) / CAMERA_FRAME, 1.0, CAMERA_MAX_PULL)
 	var target := Vector3(focus.x, 0, focus.z) + CAMERA_OFFSET * pull
@@ -320,21 +322,21 @@ func _follow(head: Vector3, rival_head: Vector3, delta: float) -> void:
 
 
 func _draw_hud() -> void:
-	var embers := "Embers  %d" % arena.score
-	if arena.goal > 0:
-		embers += " / %d" % arena.goal
+	var embers := "Embers  %d" % session.score
+	if session.goal > 0:
+		embers += " / %d" % session.goal
 	var lines := [level.title, embers]
 	if watching != null:
-		lines.append("Replay  %d / %d" % [arena.ticks, watching.ticks])
-	if arena.rival != null:
+		lines.append("Replay  %d / %d" % [session.ticks, watching.ticks])
+	if session.rival != null:
 		lines.append(
-			"Rival  %d" % arena.rival_score + (" / %d" % arena.goal if arena.goal > 0 else "")
+			"Rival  %d" % session.rival_score + (" / %d" % session.goal if session.goal > 0 else "")
 		)
-	for powerup in arena.active:
+	for powerup in session.active:
 		lines.append("%s  %d" % [powerup.title, powerup.remaining])
 	score_label.text = "\n".join(lines)
-	if watching != null and (_replay_over() or arena.state != Arena.State.PLAYING):
-		var ending := arena.death if arena.state == Arena.State.OVER else "Replay over"
+	if watching != null and (_replay_over() or session.state != Session.State.PLAYING):
+		var ending := session.death if session.state == Session.State.OVER else "Replay over"
 		banner.text = "%s\nR to watch again    Enter to fly    %s" % [ending, _picker()]
 		return
 	if watching != null:
@@ -342,23 +344,27 @@ func _draw_hud() -> void:
 			"Replay of level %d, seed %d    Enter to fly" % [watching.level, watching.seed]
 		)
 		return
-	match arena.state:
-		Arena.State.READY:
+	match session.state:
+		Session.State.READY:
 			var intro := [
 				"Level %d of %d: %s" % [_number(), campaign.steps.size(), level.title],
 				level.blurb,
-				"Eat %d embers to clear it" % arena.goal if arena.goal > 0 else "No goal: fly free",
+				(
+					"Eat %d embers to clear it" % session.goal
+					if session.goal > 0
+					else "No goal: fly free"
+				),
 			]
-			if arena.rival != null:
+			if session.rival != null:
 				intro.append("A rival dragon races you for them. Head-on, the longer dragon wins.")
 			intro.append_array(problems)
 			intro.append("Arrow keys to fly    %s" % _picker())
 			banner.text = "\n".join(intro)
-		Arena.State.OVER:
+		Session.State.OVER:
 			banner.text = (
-				"%s\nEnter to fly again    R replay    S save    %s" % [arena.death, _picker()]
+				"%s\nEnter to fly again    R replay    S save    %s" % [session.death, _picker()]
 			)
-		Arena.State.WON:
+		Session.State.WON:
 			if _number() < campaign.steps.size():
 				banner.text = (
 					"Level clear!\nEnter for level %d    R replay    S save    %s"
@@ -374,10 +380,10 @@ func _center(cell: Vector2i) -> Vector3:
 	return Vector3(cell.x + 0.5, 0, cell.y + 0.5)
 
 
-## A replay that reached its last recorded tick without the game ending (a
+## A replay that reached its last recorded tick without the session ending (a
 ## file trimmed by hand, say) stops there instead of flying on with no one steering.
 func _replay_over() -> bool:
-	return watching != null and arena.ticks >= watching.ticks
+	return watching != null and session.ticks >= watching.ticks
 
 
 ## This step's place in the campaign, counting from 1 as the player does.

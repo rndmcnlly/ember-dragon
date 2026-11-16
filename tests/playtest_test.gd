@@ -34,7 +34,7 @@ func test_a_turn_the_dragon_cannot_take_is_reported() -> void:
 	assert_true(notes.warnings[0].begins_with("tick 2: turn left did nothing"))
 
 
-## The playtest compares its recorded game with a dry run; that only works if two
+## The playtest compares its recorded session with a dry run; that only works if two
 ## runs of one plan write the same log, word for word.
 func test_the_same_plan_writes_the_same_log() -> void:
 	var text := FileAccess.get_file_as_string("res://playtests/caldera-lava.replay")

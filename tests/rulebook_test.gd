@@ -46,51 +46,53 @@ func test_mistakes_cite_the_line() -> void:
 
 
 func test_triggers_fire_on_their_ticks() -> void:
-	var arena := _arena('every 3 ticks: say "tick"\nat score 1: say "one"')
+	var session := _session('every 3 ticks: say "tick"\nat score 1: say "one"')
 	var heard := []
-	arena.announced.connect(func(text): heard.append(text))
+	session.announced.connect(func(text): heard.append(text))
 	var each_tick := []
 	for i in 9:
 		if i == 7:
-			arena.score = 1
-		arena.tick()
+			session.score = 1
+		session.tick()
 		each_tick.append(" ".join(heard))
 		heard.clear()
 	assert_eq(each_tick, ["", "", "tick", "", "", "tick", "", "one", "tick"])
 
 
 func test_spread_grows_next_to_its_kind_and_never_near_the_head() -> void:
-	var arena := _arena("every 1 tick: spread lava 2")
-	arena.board.set_kinds([Vector2i(1, 1)], "lava")
-	arena.tick()
-	var lava := arena.board.tiles.keys().filter(func(c): return arena.board.kind_at(c) == "lava")
+	var session := _session("every 1 tick: spread lava 2")
+	session.board.set_kinds([Vector2i(1, 1)], "lava")
+	session.tick()
+	var lava := session.board.tiles.keys().filter(
+		func(c): return session.board.kind_at(c) == "lava"
+	)
 	assert_eq(lava.size(), 3)
 	for cell in lava:
-		assert_true(not arena.near_head(cell))
+		assert_true(not session.near_head(cell))
 
 
 func test_spread_never_seals_off_reachable_ground() -> void:
 	# A corridor along the top row, whose only way in is down the left edge past (1, 3).
-	var arena := _arena("every 1 tick: spread lava 50")
+	var session := _session("every 1 tick: spread lava 50")
 	for x in range(2, 23):
-		arena.board.tiles[Vector2i(x, 2)] = "wall"
-	arena.board.tiles[Vector2i(2, 3)] = "lava"  # right beside that chokepoint
+		session.board.tiles[Vector2i(x, 2)] = "wall"
+	session.board.tiles[Vector2i(2, 3)] = "lava"  # right beside that chokepoint
 	for i in 4:
-		arena.tick()
-	assert_eq(arena.board.kind_at(Vector2i(1, 3)), "floor")
-	assert_true(arena.board.reachable(arena.dragon.body[0]).has(Vector2i(20, 1)))
+		session.tick()
+	assert_eq(session.board.kind_at(Vector2i(1, 3)), "floor")
+	assert_true(session.board.reachable(session.dragon.body[0]).has(Vector2i(20, 1)))
 
 
 func test_replace_and_place_change_the_board() -> void:
-	var arena := _arena(
+	var session := _session(
 		"at tick 1: replace lava with water\nat tick 1: place bridge from 2,2 to 3,3"
 	)
-	arena.board.set_kinds([Vector2i(20, 20), Vector2i(20, 19)], "lava")
+	session.board.set_kinds([Vector2i(20, 20), Vector2i(20, 19)], "lava")
 	var changed := []
-	arena.board.changed.connect(func(cells): changed.append_array(cells))
-	arena.tick()
-	assert_eq(arena.board.kind_at(Vector2i(20, 20)), "water")
-	assert_eq(arena.board.kind_at(Vector2i(3, 3)), "bridge")
+	session.board.changed.connect(func(cells): changed.append_array(cells))
+	session.tick()
+	assert_eq(session.board.kind_at(Vector2i(20, 20)), "water")
+	assert_eq(session.board.kind_at(Vector2i(3, 3)), "bridge")
 	assert_eq(changed.size(), 6)
 
 
@@ -103,16 +105,16 @@ func test_every_shipped_rules_file_is_clean() -> void:
 			assert_true(book.rules.size() > 0)
 
 
-## A started arena running these rules: the dragon flies down the middle from near
+## A started session running these rules: the dragon flies down the middle from near
 ## the top, and the ember waits in a far corner.
-func _arena(rules: String) -> Arena:
+func _session(rules: String) -> Session:
 	var board := Board.bordered(Vector2i(24, 24))
 	board.start = Vector2i(12, 5)
 	board.facing = Vector2i.DOWN
-	var arena := Arena.new(board)
+	var session := Session.new(board)
 	var book := Rulebook.parse(rules)
 	assert_eq(book.errors, [] as Array[String])
-	book.attach(arena)
-	arena.food = Vector2i(1, 22)
-	arena.start()
-	return arena
+	book.attach(session)
+	session.food = Vector2i(1, 22)
+	session.start()
+	return session

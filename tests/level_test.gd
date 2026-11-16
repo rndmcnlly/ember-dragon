@@ -24,9 +24,9 @@ func test_the_arrow_places_and_points_the_dragon() -> void:
 	assert_eq(level.board.start, Vector2i(4, 2))
 	assert_eq(level.board.facing, Vector2i.RIGHT)
 	assert_eq(level.board.kind_at(level.board.start), "floor")
-	var arena := Arena.new(level.board)
-	assert_eq(arena.dragon.body[0], Vector2i(4, 2))
-	assert_eq(arena.dragon.body[1], Vector2i(3, 2))
+	var session := Session.new(level.board)
+	assert_eq(session.dragon.body[0], Vector2i(4, 2))
+	assert_eq(session.dragon.body[1], Vector2i(3, 2))
 
 
 func test_every_legend_symbol_names_a_tile_kind() -> void:

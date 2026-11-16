@@ -1,4 +1,4 @@
-## A playtest's notebook. It listens to one Arena (Observer, like the sound and the
+## A playtest's notebook. It listens to one Session (Observer, like the sound and the
 ## level's rules) and writes down what happened on which tick, in words an agent can
 ## search, so the agent reads text first and only then looks at pictures. It never
 ## changes the game: it watches, and it wraps the plan's controller to see which
@@ -14,7 +14,7 @@ const WORDS := {
 	Vector2i.UP: "up", Vector2i.DOWN: "down", Vector2i.LEFT: "left", Vector2i.RIGHT: "right"
 }
 
-var arena: Arena
+var session: Session
 var plan: Replay
 var plan_text := ""  # the plan file as written, for its comments
 var title := ""  # the level's title, for the summary
@@ -44,44 +44,44 @@ class Witness:
 	func _init(wrapped: Controller) -> void:
 		inner = wrapped
 
-	func steer(game: Arena, dragon: Dragon) -> void:
-		steered[game.ticks] = true
-		inner.steer(game, dragon)
+	func steer(session: Session, dragon: Dragon) -> void:
+		steered[session.ticks] = true
+		inner.steer(session, dragon)
 
 
-## Start listening to a game the plan is about to play (after Replay.restage()).
-func _init(game: Arena, played: Replay, text: String, level_title := "") -> void:
-	arena = game
+## Start listening to a session the plan is about to play (after Replay.restage()).
+func _init(watched: Session, played: Replay, text: String, level_title := "") -> void:
+	session = watched
 	plan = played
 	plan_text = text
 	title = level_title
-	_witness = Witness.new(arena.controller)
-	arena.controller = _witness
-	arena.ate.connect(_on_ate)
-	arena.powered.connect(_on_powered)
-	arena.announced.connect(_on_announced)
-	arena.rival_ate.connect(_on_rival_ate)
-	arena.rival_crashed.connect(_on_rival_crashed)
-	arena.ticked.connect(_after_tick)
-	arena.died.connect(_on_died)
-	arena.won.connect(_on_won)
-	arena.board.changed.connect(_on_ground_changed)
-	_food = arena.food
-	_rival = arena.rival
-	_ground = arena.board.kind_at(arena.dragon.body[0])
-	var head := arena.dragon.body[0]
+	_witness = Witness.new(session.controller)
+	session.controller = _witness
+	session.ate.connect(_on_ate)
+	session.powered.connect(_on_powered)
+	session.announced.connect(_on_announced)
+	session.rival_ate.connect(_on_rival_ate)
+	session.rival_crashed.connect(_on_rival_crashed)
+	session.ticked.connect(_after_tick)
+	session.died.connect(_on_died)
+	session.won.connect(_on_won)
+	session.board.changed.connect(_on_ground_changed)
+	_food = session.food
+	_rival = session.rival
+	_ground = session.board.kind_at(session.dragon.body[0])
+	var head := session.dragon.body[0]
 	_note(
 		"start",
 		(
 			"head %s heading %s, length %d, on %s; ember at %s (%s); goal %s"
 			% [
 				_cell(head),
-				WORDS[arena.dragon.heading],
-				arena.dragon.body.size(),
+				WORDS[session.dragon.heading],
+				session.dragon.body.size(),
 				_ground,
 				_cell(_food),
 				_offset(_food),
-				"%d embers" % arena.goal if arena.goal > 0 else "none",
+				"%d embers" % session.goal if session.goal > 0 else "none",
 			]
 		)
 	)
@@ -92,29 +92,29 @@ func _init(game: Arena, played: Replay, text: String, level_title := "") -> void
 		)
 	moments.append([0, "start"])
 	_tick_start = lines.size()
-	_heading = arena.dragon.heading
+	_heading = session.dragon.heading
 
 
 ## Play the rest of the plan at once, without drawing (the dry run, and the tests).
 func play_out() -> void:
-	while arena.state == Arena.State.PLAYING and arena.ticks < plan.ticks:
-		arena.tick()
+	while session.state == Session.State.PLAYING and session.ticks < plan.ticks:
+		session.tick()
 	finish()
 
 
 ## Call once the run is over (died, won, or the plan's ticks ran out).
 func finish() -> void:
-	match arena.state:
-		Arena.State.OVER:
-			ending = "tick %d: died: %s" % [arena.ticks, arena.death]
-		Arena.State.WON:
-			ending = "tick %d: level clear (%d embers)" % [arena.ticks, arena.score]
+	match session.state:
+		Session.State.OVER:
+			ending = "tick %d: died: %s" % [session.ticks, session.death]
+		Session.State.WON:
+			ending = "tick %d: level clear (%d embers)" % [session.ticks, session.score]
 		_:
-			ending = "tick %d: plan ran out, still flying" % arena.ticks
-	for tick in plan.turns:  # turns planned after the game had already ended
-		if tick > arena.ticks:
+			ending = "tick %d: plan ran out, still flying" % session.ticks
+	for tick in plan.turns:  # turns planned after the session had already ended
+		if tick > session.ticks:
 			warnings.append(
-				"tick %d: turn never happened: the run ended on tick %d" % [tick, arena.ticks]
+				"tick %d: turn never happened: the run ended on tick %d" % [tick, session.ticks]
 			)
 	_note("end", ending.substr(ending.find(":") + 2))
 
@@ -148,41 +148,44 @@ func save(folder: String) -> void:
 
 
 func _after_tick() -> void:
-	var t := arena.ticks
-	var head := arena.dragon.body[0]
+	var t := session.ticks
+	var head := session.dragon.body[0]
 	if plan.turns.has(t):
 		_check_turns(t)
-	var ground := arena.board.kind_at(head)
+	var ground := session.board.kind_at(head)
 	if ground != _ground:
 		_ground = ground
 		var wading := (
-			" (wading: one cell every other tick)" if arena.board.pace_at(head) < 1.0 else ""
+			" (wading: one cell every other tick)" if session.board.pace_at(head) < 1.0 else ""
 		)
 		_note("ground", "head on %s at %s%s" % [ground, _cell(head), wading])
-	if arena.food != _food:
-		_food = arena.food
+	if session.food != _food:
+		_food = session.food
 		_note("ember", "now at %s (%s)" % [_cell(_food), _offset(_food)])
-	if arena.pickup != null and arena.pickup_cell != _pickup_cell:
+	if session.pickup != null and session.pickup_cell != _pickup_cell:
 		_note(
 			"pickup",
 			(
 				"%s waiting at %s (%s)"
-				% [arena.pickup.title, _cell(arena.pickup_cell), _offset(arena.pickup_cell)]
+				% [session.pickup.title, _cell(session.pickup_cell), _offset(session.pickup_cell)]
 			)
 		)
-	_pickup_cell = arena.pickup_cell if arena.pickup != null else Vector2i(-1, -1)
-	if arena.rival != null and _rival == null:
+	_pickup_cell = session.pickup_cell if session.pickup != null else Vector2i(-1, -1)
+	if session.rival != null and _rival == null:
 		_note(
 			"rival",
-			"hatched: head %s heading %s" % [_cell(arena.rival.body[0]), WORDS[arena.rival.heading]]
+			(
+				"hatched: head %s heading %s"
+				% [_cell(session.rival.body[0]), WORDS[session.rival.heading]]
+			)
 		)
 		moments.append([t, "rival"])
-	_rival = arena.rival
-	if t % STATUS_EVERY == 0 and arena.state == Arena.State.PLAYING:
+	_rival = session.rival
+	if t % STATUS_EVERY == 0 and session.state == Session.State.PLAYING:
 		_note("status", _state())
 	path.append("tick %-4d %s" % [t, _state()])
 	_tick_start = lines.size()
-	_heading = arena.dragon.heading
+	_heading = session.dragon.heading
 
 
 ## Turns at this tick: did the dragon take them? If it was wading, it was never asked.
@@ -208,7 +211,7 @@ func _check_turns(t: int) -> void:
 		)
 		_note("turn", "%s IGNORED (heading %s)" % [names, WORDS[_heading]], _tick_start)
 	else:
-		_note("turn", "%s, head now %s" % [names, _cell(arena.dragon.body[0])], _tick_start)
+		_note("turn", "%s, head now %s" % [names, _cell(session.dragon.body[0])], _tick_start)
 
 
 func _on_ate(cell: Vector2i) -> void:
@@ -216,64 +219,64 @@ func _on_ate(cell: Vector2i) -> void:
 		"ate",
 		(
 			"ember at %s; score %d, growing to length %d"
-			% [_cell(cell), arena.score, arena.dragon.body.size() + Arena.GROWTH_PER_FOOD]
+			% [_cell(cell), session.score, session.dragon.body.size() + Session.GROWTH_PER_FOOD]
 		)
 	)
-	if arena.score == 1:
-		moments.append([arena.ticks, "ate"])
+	if session.score == 1:
+		moments.append([session.ticks, "ate"])
 
 
 func _on_powered(powerup: Powerup) -> void:
 	var lasting := " for %d ticks" % powerup.duration if powerup.duration > 0 else ""
 	_note("power", "%s%s" % [powerup.title, lasting])
-	moments.append([arena.ticks, "power"])
+	moments.append([session.ticks, "power"])
 
 
 func _on_announced(text: String) -> void:
 	_note("say", '"%s"' % text)
-	moments.append([arena.ticks, "say"])
+	moments.append([session.ticks, "say"])
 
 
 func _on_rival_ate(cell: Vector2i) -> void:
-	_note("rival", "ate ember at %s; rival score %d" % [_cell(cell), arena.rival_score])
+	_note("rival", "ate ember at %s; rival score %d" % [_cell(cell), session.rival_score])
 
 
 func _on_rival_crashed(cell: Vector2i) -> void:
 	_note("rival", "crashed at %s" % _cell(cell))
-	moments.append([arena.ticks, "rival-crash"])
+	moments.append([session.ticks, "rival-crash"])
 
 
 ## Rules changed the ground (spread, replace, place): which cells became what.
 func _on_ground_changed(cells: Array) -> void:
 	if cells.is_empty():
 		return
-	var kind := arena.board.kind_at(cells[0])
+	var kind := session.board.kind_at(cells[0])
 	var shown := " ".join(cells.slice(0, 6).map(_cell))
 	var more := " and %d more" % (cells.size() - 6) if cells.size() > 6 else ""
 	var noun := "cell" if cells.size() == 1 else "cells"
 	_note("terrain", "%d %s became %s: %s%s" % [cells.size(), noun, kind, shown, more])
-	moments.append([arena.ticks, "terrain"])
+	moments.append([session.ticks, "terrain"])
 
 
 func _on_died(reason: String) -> void:
 	_after_tick()
-	var dragon := arena.dragon
+	var dragon := session.dragon
 	var head := dragon.body[0]  # a crash stops the head short; lava lets it in
-	var into := "" if arena.board.is_deadly(head) else " into %s" % _cell(head + dragon.heading)
+	var into := "" if session.board.is_deadly(head) else " into %s" % _cell(head + dragon.heading)
 	_note("died", "%s (head %s, heading %s%s)" % [reason, _cell(head), WORDS[dragon.heading], into])
-	moments.append([arena.ticks, "died"])
+	moments.append([session.ticks, "died"])
 
 
 func _on_won() -> void:
 	_after_tick()
-	_note("won", "level clear with %d embers" % arena.score)
-	moments.append([arena.ticks, "won"])
+	_note("won", "level clear with %d embers" % session.score)
+	moments.append([session.ticks, "won"])
 
 
 ## Add a line to log.txt, at the end, or at a position (a turn goes first in its tick).
 func _note(word: String, text: String, at := -1) -> void:
 	counts[word] = counts.get(word, 0) + 1
-	var line := "tick %-4d %-8s %s" % [arena.ticks, word, text]
+	var line := "tick %-4d %-8s %s" % [session.ticks, word, text]
 	if at >= 0:
 		lines.insert(at, line)
 	else:
@@ -282,25 +285,25 @@ func _note(word: String, text: String, at := -1) -> void:
 
 ## One line of where things stand, for status lines and path.txt.
 func _state() -> String:
-	var dragon := arena.dragon
+	var dragon := session.dragon
 	var head := dragon.body[0]
 	return (
 		"head %s heading %-5s on %-6s length %-3d score %d  ember %s (%s)"
 		% [
 			_cell(head),
 			WORDS[dragon.heading],
-			arena.board.kind_at(head),
+			session.board.kind_at(head),
 			dragon.body.size(),
-			arena.score,
-			_cell(arena.food),
-			_offset(arena.food),
+			session.score,
+			_cell(session.food),
+			_offset(session.food),
 		]
 	)
 
 
 ## Where a cell is from the head, in plan words: "3 right, 5 up".
 func _offset(cell: Vector2i) -> String:
-	var gap := cell - arena.dragon.body[0]
+	var gap := cell - session.dragon.body[0]
 	var parts: Array[String] = []
 	if gap.x != 0:
 		parts.append("%d %s" % [absi(gap.x), "right" if gap.x > 0 else "left"])

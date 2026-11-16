@@ -3,7 +3,7 @@
 ##
 ## A second level source next to levels/*.txt (Strategy): Campaign.Step.load_level()
 ## asks a file or this generator, and either way hands back a Level. Nothing after
-## that knows the difference, so the Arena, the Stage, replays, and the reachability
+## that knows the difference, so the Session, the Stage, replays, and the reachability
 ## test treat a grown map exactly like a drawn one.
 ##
 ## Four steps, in order, each a few lines and each drawing from the same seeded rng:

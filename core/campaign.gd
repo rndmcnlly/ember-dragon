@@ -21,13 +21,13 @@ class Step:
 	var rules := ""  # a file in levels/, without .rules, scripting events (see Rulebook)
 	var rival := false  # a rival dragon from the start (rules can also summon one later)
 
-	## Tune a fresh Arena to this step.
-	func prepare(arena: Arena) -> void:
-		arena.goal = goal
-		arena.pickup_kinds = pickups.duplicate()
-		arena.tempo = tempo
+	## Tune a fresh Session to this step.
+	func prepare(session: Session) -> void:
+		session.goal = goal
+		session.pickup_kinds = pickups.duplicate()
+		session.tempo = tempo
 		if rival:
-			arena.summon_rival()
+			session.summon_rival()
 
 	## This step's map, from one of two sources (Strategy): grown by Terrain from the
 	## game's seed, or read from levels/. A broken file still gives a playable field
@@ -46,13 +46,13 @@ class Step:
 			return Rulebook.new()
 		return Rulebook.load_file("res://levels/%s.rules" % rules)
 
-	## A new game of this step on its level, with every random choice drawn from seed.
-	## The game and Replay both start games here, which is why a replay matches.
-	func play(on: Level, seed: int) -> Arena:
-		var arena := Arena.new(on.board.copy(), seed)  # a copy: rules may change the ground
-		prepare(arena)
-		rulebook().attach(arena)
-		return arena
+	## A new Session of this step on its level, with every random choice drawn from seed.
+	## The game and Replay both start sessions here, which is why a replay matches.
+	func play(on: Level, seed: int) -> Session:
+		var session := Session.new(on.board.copy(), seed)  # a copy: rules may change the ground
+		prepare(session)
+		rulebook().attach(session)
+		return session
 
 
 var title := ""

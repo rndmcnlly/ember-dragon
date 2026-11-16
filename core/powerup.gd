@@ -1,5 +1,5 @@
-## A pickup's effect (Strategy): each subclass changes the Arena in its own way,
-## and the Arena never needs to know which one it holds.
+## A pickup's effect (Strategy): each subclass changes the Session in its own way,
+## and the Session never needs to know which one it holds.
 class_name Powerup
 extends RefCounted
 
@@ -8,9 +8,9 @@ var duration := 0  # in ticks; 0 means the effect is instant
 var remaining := 0
 
 
-func start(_arena: Arena) -> void:
+func start(_session: Session) -> void:
 	pass
 
 
-func finish(_arena: Arena) -> void:
+func finish(_session: Session) -> void:
 	pass

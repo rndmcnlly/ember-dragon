@@ -20,7 +20,7 @@ const STARTS := {
 	"v": Vector2i.DOWN,
 }
 const HEADERS := ["title", "blurb"]
-const START_LENGTH := 4  # the Arena's new dragon; its body needs room behind the head
+const START_LENGTH := 4  # the Session's new dragon; its body needs room behind the head
 
 var name := ""  # the file name without .txt, e.g. "ford"
 var title := ""

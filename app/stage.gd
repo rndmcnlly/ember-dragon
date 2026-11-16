@@ -1,4 +1,4 @@
-## The world around the Arena: sky, sun, and the board's tiles. Each kind of tile is
+## The world around the board: sky, sun, and the board's tiles. Each kind of tile is
 ## one MultiMesh (Flyweight made visible: one mesh uploaded once, drawn at a thousand
 ## transforms in one call). draw_board() redraws them for a new level.
 class_name Stage
@@ -13,8 +13,8 @@ const STRETCHED := ["wall"]  # random heights, for a ragged skyline
 const SUNK := ["floor"]  # a few millimeters up or down, like hand-laid stone
 ## Kit materials that Godot animates, found by the name Blender gave them.
 const SHADERS := {
-	"Lava": preload("res://game/lava.gdshader"),
-	"Water": preload("res://game/water.gdshader"),
+	"Lava": preload("res://app/lava.gdshader"),
+	"Water": preload("res://app/water.gdshader"),
 }
 ## Colors for plain boxes when the kit lacks a kind's mesh. Magenta means "art missing".
 const FALLBACK_COLORS := {"floor": Color("9c8a6c"), "wall": Color("4d4038")}
@@ -114,7 +114,7 @@ func _sun() -> DirectionalLight3D:
 	return sun
 
 
-## Ground beyond the walls, just under the tiles, so the arena is not floating in the sky.
+## Ground beyond the walls, just under the tiles, so the board is not floating in the sky.
 func _make_skirt() -> MeshInstance3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = EARTH

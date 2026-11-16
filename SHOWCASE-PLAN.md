@@ -15,7 +15,7 @@ easy to *locate* and *read* (one file or folder where possible, named after the 
   web export). Run `deno task fmt` first. Godot exits 0 on script errors; trust the
   task's exit code, which watches for them.
 - Rules live in `core/` (engine-free `RefCounted`, tested headless in `tests/`);
-  `game/` only draws, plays sound, and forwards input. Every new rule gets tests.
+  `app/` only draws, plays sound, and forwards input. Every new rule gets tests.
 - Art only via `tools/build_art.py` builders registered in `PIECES`/`TILES`
   (run `deno task art`, ~10 s, cached). Sound only via `tools/build_sfx.py`.
 - Don't use `deno task dev` (it opens windows). For visual checks, export
@@ -42,8 +42,8 @@ easy to *locate* and *read* (one file or folder where possible, named after the 
 | Language | External DSL | Interpreter (GoF), parsing | a small rule/event language in its own files; parse errors cite the line; tests |
 | Systems | Powerups | Strategy | DONE: `core/powerup.gd`, `core/powerups/` |
 | Systems | Rival dragon | Strategy for controllers | a second Dragon with its own controller (AI or local 2P); one rules core drives both |
-| Systems | Replays | Command, seeded RNG | record turns per tick; same seed + record reproduces the game; golden replay test in CI |
-| Content | Sound as code | Observer | DONE: `tools/build_sfx.py`, sounds wired to Arena signals |
+| Systems | Replays | Command, seeded RNG | record turns per tick; same seed + record reproduces the session; golden replay test in CI |
+| Content | Sound as code | Observer | DONE: `tools/build_sfx.py`, sounds wired to Session signals |
 | Content | Procedural terrain | Strategy, seeded generation | obstacle generator; same seed, same map; tests prove the start is clear |
 | Content | Showcase art | Blender as code | DONE: `tools/build_art.py` |
 | Process | Release pipeline | CI/CD | tagged releases publish to itch.io from CI (butler) as well as Pages; changelog |
@@ -52,9 +52,9 @@ easy to *locate* and *read* (one file or folder where possible, named after the 
 ## Phases (one agent each, in order)
 
 0. **Board.** Port `core/board.gd` from `../d4-dev` (tile vocabulary, `Board.TILES`
-   with `solid`, `Board.bordered`). The Arena takes a Board, collides with
+   with `solid`, `Board.bordered`). The Session takes a Board, collides with
    `is_solid` instead of a bounds check, and never spawns food/pickups on solid
-   cells. `game/main.gd` passes `board.tiles` to `Stage` instead of its own
+   cells. `app/main.gd` passes `board.tiles` to `Stage` instead of its own
    `_board()`. Today walls sit outside the 40x40 grid; switching to
    `Board.bordered(Vector2i(42, 42))` keeps the play area. Update tests.
 1. **Language:** text levels with a broader tile vocabulary (at least lava = deadly,

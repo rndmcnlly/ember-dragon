@@ -12,6 +12,9 @@ Nothing has been tagged yet. Everything below is on `main` and on Pages.
 
 ### Process
 
+- **Names match E5.** `game/` is now `app/` (the engine adapter: views and input)
+  and `Arena` is now `Session` (one run at one level), the words the course's E5
+  starter uses, so "game" means only the product. Nothing changes in play.
 - **Release pipeline.** Version tags publish the web build to itch.io with butler
   (`release.yml`), after the same checks as every push. It skips, with a notice
   in the run's log, until the `BUTLER_API_KEY` secret and `ITCH_TARGET` variable

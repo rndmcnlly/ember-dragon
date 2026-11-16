@@ -5,45 +5,45 @@ const HEAD := Vector2i(29, 6)  # where the golden replay's dragon ends
 const LENGTH := 25  # 4 to start, 3 per ember; the eighth's growth never comes
 
 
-## The golden test: a recorded game, replayed, must end exactly as it did when it was
+## The golden test: a recorded session, replayed, must end exactly as it did when it was
 ## recorded. Rules changes that alter play (on purpose or not) show up here first.
 func test_the_golden_replay_ends_as_recorded() -> void:
 	var replay := Replay.load_file("res://tests/golden.replay")
 	assert_eq(replay.errors, [] as Array[String])
-	var arena := replay.run(TRAIL.ember_trail())
-	assert_eq(arena.ticks, 386)
-	assert_eq(arena.state, Arena.State.WON)
-	assert_eq(arena.score, 8)
-	assert_eq(arena.rival_score, 7)  # one short of winning the race
-	assert_eq(arena.rival, null)  # it crashed along the way
-	assert_eq(arena.dragon.body[0], HEAD)
-	assert_eq(arena.dragon.body.size(), LENGTH)
+	var session := replay.run(TRAIL.ember_trail())
+	assert_eq(session.ticks, 386)
+	assert_eq(session.state, Session.State.WON)
+	assert_eq(session.score, 8)
+	assert_eq(session.rival_score, 7)  # one short of winning the race
+	assert_eq(session.rival, null)  # it crashed along the way
+	assert_eq(session.dragon.body[0], HEAD)
+	assert_eq(session.dragon.body.size(), LENGTH)
 
 
-## Record a game through the keyboard's controller, save it as text, read it back, and
+## Record a session through the keyboard's controller, save it as text, read it back, and
 ## replay it: same body, same ember, same ground. The Caldera's lava spreads at random,
 ## so this only passes if every random roll comes back the same.
 func test_a_recorded_game_replays_exactly() -> void:
 	var campaign: Campaign = TRAIL.ember_trail()
 	var step := campaign.steps[4]
-	var arena := step.play(step.load_level(), 2026)
+	var session := step.play(step.load_level(), 2026)
 	var keys := AiAtTheKeys.new()
-	arena.controller = keys
-	arena.start()
-	while arena.state == Arena.State.PLAYING and arena.ticks < 400:
-		arena.tick()
+	session.controller = keys
+	session.start()
+	while session.state == Session.State.PLAYING and session.ticks < 400:
+		session.tick()
 	var recorded := Replay.new()
 	recorded.level = 5
 	recorded.map = step.map
 	recorded.seed = 2026
-	recorded.ticks = arena.ticks
+	recorded.ticks = session.ticks
 	recorded.turns = keys.player.log
 	var replayed := Replay.parse(recorded.to_text()).run(campaign)
-	assert_true(arena.ticks > 120)  # long enough for the lava to spread three times
+	assert_true(session.ticks > 120)  # long enough for the lava to spread three times
 	for field in ["ticks", "score", "state", "death", "food", "pickup_cell"]:
-		assert_eq(replayed.get(field), arena.get(field))
-	assert_eq(replayed.dragon.body, arena.dragon.body)
-	assert_eq(replayed.board.tiles, arena.board.tiles)
+		assert_eq(replayed.get(field), session.get(field))
+	assert_eq(replayed.dragon.body, session.dragon.body)
+	assert_eq(replayed.board.tiles, session.board.tiles)
 
 
 ## Presses keys the way the AI would steer, through a real PlayerController: a
@@ -53,14 +53,14 @@ class AiAtTheKeys:
 	var ai := GreedyController.new()
 	var player := PlayerController.new()
 
-	func steer(arena: Arena, dragon: Dragon) -> void:
+	func steer(session: Session, dragon: Dragon) -> void:
 		var heading := dragon.heading
-		ai.steer(arena, dragon)
+		ai.steer(session, dragon)
 		var wanted := dragon.steer()  # peek at the AI's turn, then undo it
 		dragon.heading = heading
 		if wanted - dragon.body[0] != heading:
 			player.press(wanted - dragon.body[0])
-		player.steer(arena, dragon)
+		player.steer(session, dragon)
 
 
 func test_text_round_trip() -> void:

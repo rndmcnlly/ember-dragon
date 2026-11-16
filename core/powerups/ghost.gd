@@ -8,9 +8,9 @@ func _init() -> void:
 	duration = 40
 
 
-func start(arena: Arena) -> void:
-	arena.ghost = true
+func start(session: Session) -> void:
+	session.ghost = true
 
 
-func finish(arena: Arena) -> void:
-	arena.ghost = false
+func finish(session: Session) -> void:
+	session.ghost = false

@@ -44,15 +44,18 @@ played in the browser" on the uploaded `html5` channel once.
 ## Layout
 
 - `project.godot`, `main.tscn`, `export_presets.cfg`: Godot's own config, plain text, editable by hand.
-- `core/dragon.gd`: the dragon's rules on the grid (movement, a turn queue). No Nodes; tested headless.
+- `core/session.gd`: one run at one level: food, score, collisions, powerups, and the rival.
+  No Nodes; tested headless.
+- `core/campaign.gd`: the levels in order; each step makes a fresh `Session` for every try.
+- `core/dragon.gd`: the dragon's body and steering (a turn queue). No Nodes; tested headless.
 - `core/controllers/`: who steers a dragon: the keyboard, the rival's AI.
-- `core/replay.gd`: a recorded game (level, seed, turns per tick) and its playback.
+- `core/replay.gd`: a recorded session (level, seed, turns per tick) and its playback.
 - `core/terrain.gd`: grows a map from a seed (river, rocks, lava), for the Wilds.
 - `levels/`: maps (`*.txt`), event scripts (`*.rules`), and the campaign that orders
   them (`campaign.gd`); `levels/README.md` is the legend and the rules reference.
 - `core/kit.gd`: which piece (head, straight, turn, tail) goes in each cell and how far to rotate it.
-- `game/main.gd`: the engine adapter. Builds the stage in code, ticks the dragon, draws it with
-  four shared meshes.
+- `app/main.gd`: the engine adapter. Builds the stage in code, ticks the session, draws the
+  dragons and the HUD.
 - `tools/build_art.py`: Blender as code. The dragon kit is drawn as ASCII voxel layers; edit, run
   `deno task art`, replay.
 - `playtests/`: plans for agentic playtests and the driver that plays them; evidence

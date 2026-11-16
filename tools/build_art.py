@@ -96,7 +96,7 @@ ARCANE_GLOW = pbr_material("ArcaneGlow", "#d2a8ff", roughness=0.2, emission="#b7
 STONE = pbr_material("Stone", "#8f8777", roughness=0.85, vertex_color=True)
 WALL_STONE = pbr_material("WallStone", "#5a5049", roughness=0.9, vertex_color=True)
 # Godot finds "Lava" and "Water" by name and animates them with a small shader
-# (game/stage.gd), reading these colors as its starting point.
+# (app/stage.gd), reading these colors as its starting point.
 LAVA = pbr_material("Lava", "#ff6418", roughness=0.6, emission="#ff4a0a", strength=2.2)
 CRUST = pbr_material("LavaCrust", "#33241e", roughness=0.95, emission="#ff3c0a", strength=0.12, vertex_color=True)
 WATER = pbr_material("Water", "#123f52", roughness=0.05)

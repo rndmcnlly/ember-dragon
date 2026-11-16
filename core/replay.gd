@@ -1,8 +1,8 @@
-## A recorded game: which level, the seed, and the player's turn commands per tick.
-## Nothing else needs saving. Every random choice comes from the Arena's seeded rng,
+## A recorded session: which level, the seed, and the player's turn commands per tick.
+## Nothing else needs saving. Every random choice comes from the Session's seeded rng,
 ## the rival's AI reads the board and never rolls dice, and a turn is a Command the
 ## dragon applies on a tick, never in between; so replaying the same commands on the
-## same ticks from the same seed plays the same game, down to the last ember.
+## same ticks from the same seed plays the same session, down to the last ember.
 ##
 ## Saved as text, one command line per tick that had any:
 ##
@@ -24,7 +24,7 @@ const WORDS := {
 var level := 1  # the campaign step, counting from 1 as the player does
 var map := ""  # that step's map, to notice when the campaign has changed since
 var seed := 0
-var ticks := 0  # how long the game ran
+var ticks := 0  # how long the session ran
 var turns := {}  # tick -> Array of directions, in the order they were pressed
 var errors: Array[String] = []  # problems reading the file
 
@@ -37,33 +37,33 @@ class Playback:
 	func _init(recorded: Dictionary) -> void:
 		turns = recorded
 
-	func steer(arena: Arena, dragon: Dragon) -> void:
-		for direction in turns.get(arena.ticks, []):
+	func steer(session: Session, dragon: Dragon) -> void:
+		for direction in turns.get(session.ticks, []):
 			dragon.turn(direction)
 
 
-## The game as it stood before the first move, steered by the recording and started.
+## The session as it stood before the first move, steered by the recording and started.
 ## Null, with a message in errors, when the campaign no longer has this level.
-func restage(campaign: Campaign) -> Arena:
+func restage(campaign: Campaign) -> Session:
 	if level < 1 or level > campaign.steps.size() or campaign.steps[level - 1].map != map:
 		errors.append(
 			"this replay is of level %d (%s), which the campaign no longer has" % [level, map]
 		)
 		return null
 	var step := campaign.steps[level - 1]
-	var arena := step.play(step.load_level(seed), seed)  # a grown map grows from it too
-	arena.controller = Playback.new(turns)
-	arena.start()
-	return arena
+	var session := step.play(step.load_level(seed), seed)  # a grown map grows from it too
+	session.controller = Playback.new(turns)
+	session.start()
+	return session
 
 
-## Play the whole recording at once, without drawing anything, and return the game as
+## Play the whole recording at once, without drawing anything, and return the session as
 ## it ended. The golden replay test is this plus a few asserts.
-func run(campaign: Campaign) -> Arena:
-	var arena := restage(campaign)
-	while arena != null and arena.state == Arena.State.PLAYING and arena.ticks < ticks:
-		arena.tick()
-	return arena
+func run(campaign: Campaign) -> Session:
+	var session := restage(campaign)
+	while session != null and session.state == Session.State.PLAYING and session.ticks < ticks:
+		session.tick()
+	return session
 
 
 func to_text() -> String:

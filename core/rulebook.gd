@@ -33,13 +33,13 @@ class Trigger:
 	var n := 0  # the tick or score to wait for, or the period of EVERY
 	var fired := false
 
-	func fires(arena: Arena) -> bool:
+	func fires(session: Session) -> bool:
 		match kind:
 			Kind.AT_TICK:
-				return arena.ticks == n
+				return session.ticks == n
 			Kind.EVERY:
-				return arena.ticks % n == 0
-		if fired or arena.score < n:  # AT_SCORE: once, as soon as the score gets there
+				return session.ticks % n == 0
+		if fired or session.score < n:  # AT_SCORE: once, as soon as the score gets there
 			return false
 		fired = true
 		return true
@@ -64,7 +64,7 @@ class Trigger:
 ## What a rule does. Each subclass is one verb: a static read() that turns the words
 ## after the colon into an instance (or an error message), and run() that does it.
 class Action:
-	func run(_arena: Arena) -> void:
+	func run(_session: Session) -> void:
 		pass
 
 	## The tile kinds this action names, so the parser can check them in one place.
@@ -85,8 +85,8 @@ class Say:
 		say.text = quoted.substr(1, quoted.length() - 2)
 		return say
 
-	func run(arena: Arena) -> void:
-		arena.announce(text)
+	func run(session: Session) -> void:
+		session.announce(text)
 
 
 ## spread lava 2: that many clear cells next to the kind become the kind. Lava and
@@ -109,34 +109,34 @@ class Spread:
 	func kinds() -> Array:
 		return [kind]
 
-	func run(arena: Arena) -> void:
+	func run(session: Session) -> void:
 		var edge := []
-		for cell in arena.board.tiles:
-			if arena.is_clear(cell) and not arena.near_head(cell) and _touches(arena, cell):
+		for cell in session.board.tiles:
+			if session.is_clear(cell) and not session.near_head(cell) and _touches(session, cell):
 				edge.append(cell)
 		var grown := 0
 		while grown < count and not edge.is_empty():
-			var cell: Vector2i = edge.pop_at(arena.rng.randi_range(0, edge.size() - 1))
-			if not _seals(arena, cell):
-				arena.board.set_kinds([cell], kind)
+			var cell: Vector2i = edge.pop_at(session.rng.randi_range(0, edge.size() - 1))
+			if not _seals(session, cell):
+				session.board.set_kinds([cell], kind)
 				grown += 1
 
-	func _touches(arena: Arena, cell: Vector2i) -> bool:
+	func _touches(session: Session, cell: Vector2i) -> bool:
 		for step in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
-			if arena.board.kind_at(cell + step) == kind:
+			if session.board.kind_at(cell + step) == kind:
 				return true
 		return false
 
 	## Whether turning this cell into the kind would wall off more than the cell itself.
-	func _seals(arena: Arena, cell: Vector2i) -> bool:
-		var board := arena.board
+	func _seals(session: Session, cell: Vector2i) -> bool:
+		var board := session.board
 		var row: Dictionary = Board.TILES[kind]
 		if not (row.solid or row.deadly):
 			return false
-		var before := board.reachable(arena.dragon.body[0]).size()
+		var before := board.reachable(session.dragon.body[0]).size()
 		var was: String = board.tiles[cell]
 		board.tiles[cell] = kind  # try it, count, and put it back
-		var after := board.reachable(arena.dragon.body[0]).size()
+		var after := board.reachable(session.dragon.body[0]).size()
 		board.tiles[cell] = was
 		return after < before - 1
 
@@ -158,11 +158,12 @@ class Replace:
 	func kinds() -> Array:
 		return [from, to]
 
-	func run(arena: Arena) -> void:
-		var cells := arena.board.tiles.keys().filter(
-			func(cell): return arena.board.kind_at(cell) == from and Rulebook.safe(arena, cell, to)
+	func run(session: Session) -> void:
+		var cells := session.board.tiles.keys().filter(
+			func(cell):
+				return session.board.kind_at(cell) == from and Rulebook.safe(session, cell, to)
 		)
-		arena.board.set_kinds(cells, to)
+		session.board.set_kinds(cells, to)
 
 
 ## place bridge at 20,9   or   place bridge from 20,9 to 23,9
@@ -190,14 +191,14 @@ class Place:
 	func kinds() -> Array:
 		return [kind]
 
-	func run(arena: Arena) -> void:
+	func run(session: Session) -> void:
 		var cells := []
 		for x in range(corners.position.x, corners.end.x + 1):
 			for y in range(corners.position.y, corners.end.y + 1):
 				var cell := Vector2i(x, y)
-				if arena.board.tiles.has(cell) and Rulebook.safe(arena, cell, kind):
+				if session.board.tiles.has(cell) and Rulebook.safe(session, cell, kind):
 					cells.append(cell)
-		arena.board.set_kinds(cells, kind)
+		session.board.set_kinds(cells, kind)
 
 
 ## move ember
@@ -207,8 +208,8 @@ class Move:
 	static func read(words: PackedStringArray) -> Variant:
 		return Move.new() if " ".join(words) == "move ember" else 'expected "move ember"'
 
-	func run(arena: Arena) -> void:
-		arena.move_food()
+	func run(session: Session) -> void:
+		session.move_food()
 
 
 ## drop haste   (or ghost, or trim)
@@ -224,8 +225,8 @@ class Drop:
 		drop.powerup = named[words[1]]
 		return drop
 
-	func run(arena: Arena) -> void:
-		arena.drop(powerup)
+	func run(session: Session) -> void:
+		session.drop(powerup)
 
 
 ## summon rival: a second dragon, steered by the rival AI, hatches far from the player.
@@ -235,8 +236,8 @@ class Summon:
 	static func read(words: PackedStringArray) -> Variant:
 		return Summon.new() if " ".join(words) == "summon rival" else 'expected "summon rival"'
 
-	func run(arena: Arena) -> void:
-		arena.summon_rival()
+	func run(session: Session) -> void:
+		session.summon_rival()
 
 
 ## Each verb of the language and the Action class that reads it.
@@ -274,19 +275,19 @@ static func parse(text: String, source := "level.rules") -> Rulebook:
 	return book
 
 
-## Follow the arena: every tick of play, run the rules. The arena holds this
-## connection, so the connection holds the arena only weakly: RefCounted objects that
+## Follow the session: every tick of play, run the rules. The session holds this
+## connection, so the connection holds the session only weakly: RefCounted objects that
 ## point at each other are never freed.
-func attach(arena: Arena) -> void:
-	var weak: WeakRef = weakref(arena)
-	arena.ticked.connect(func(): run(weak.get_ref()))
+func attach(session: Session) -> void:
+	var weak: WeakRef = weakref(session)
+	session.ticked.connect(func(): run(weak.get_ref()))
 
 
 ## Run each rule whose trigger fires on this tick.
-func run(arena: Arena) -> void:
+func run(session: Session) -> void:
 	for rule in rules:
-		if rule.trigger.fires(arena):
-			rule.action.run(arena)
+		if rule.trigger.fires(session):
+			rule.action.run(session)
 
 
 ## Parse one line into a Rule and keep it; return what is wrong, or "" if nothing.
@@ -316,12 +317,12 @@ func _read_rule(line: String) -> String:
 
 ## Rules never drop a wall or lava on a dragon or right in front of one, and never
 ## put the ember or a pickup on ground where it could not have appeared.
-static func safe(arena: Arena, cell: Vector2i, kind: String) -> bool:
+static func safe(session: Session, cell: Vector2i, kind: String) -> bool:
 	var row: Dictionary = Board.TILES[kind]
-	if cell == arena.food or cell == arena.pickup_cell:
+	if cell == session.food or cell == session.pickup_cell:
 		return row.spawns
 	if row.solid or row.deadly:
-		return not (arena.on_a_dragon(cell) or arena.near_head(cell))
+		return not (session.on_a_dragon(cell) or session.near_head(cell))
 	return true
 
 

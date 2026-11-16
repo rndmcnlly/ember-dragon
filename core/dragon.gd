@@ -1,4 +1,4 @@
-## The dragon's body and steering. The Arena decides what it may run into.
+## The dragon's body and steering. The Session decides what it may run into.
 class_name Dragon
 extends RefCounted
 
@@ -7,7 +7,7 @@ const MIN_LENGTH := 2
 
 var body: Array[Vector2i] = []  # head first
 var heading := Vector2i.RIGHT
-var stride := 0.0  # progress toward the next cell; slow ground fills it over ticks (Arena)
+var stride := 0.0  # progress toward the next cell; slow ground fills it over ticks (Session)
 var _turns: Array[Vector2i] = []  # turns wait here until the next tick (Command)
 var _growth := 0  # cells still to grow, one per tick
 

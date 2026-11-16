@@ -39,7 +39,7 @@ static func bordered(grid_size: Vector2i) -> Board:
 	return board
 
 
-## A fresh copy to play on, so changes during one game never reach the next.
+## A fresh copy to play on, so changes during one session never reach the next.
 func copy() -> Board:
 	var board := Board.new()
 	board.size = size

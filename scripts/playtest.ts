@@ -4,7 +4,7 @@
 // 1. A dry run, headless: checks the plan and writes log.txt, path.txt, summary.txt.
 //    A broken plan stops here, before any window opens.
 // 2. Unless --dry: the same plan again in a window, recorded by Godot's Movie Maker
-//    into video.avi, with PNG snapshots. The two logs must match (same seed, same game).
+//    into video.avi, with PNG snapshots. The two logs must match (same seed, same session).
 //
 // Movie Maker needs a real window and GPU, so step 2 flashes a window for a few seconds
 // and does not run on CI runners. Both steps go through scripts/godot.ts, which fails
@@ -12,7 +12,7 @@
 
 const SCENE = "res://playtests/playtest.tscn";
 const FPS = 30;
-const TICK_SECONDS = 0.11; // game/main.gd's tick at normal speed; faster levels need fewer frames
+const TICK_SECONDS = 0.11; // app/main.gd's tick at normal speed; faster levels need fewer frames
 
 const [planArg, ...flags] = Deno.args;
 if (!planArg || !planArg.endsWith(".replay")) {
@@ -71,7 +71,7 @@ if (code !== 0) {
   Deno.exit(1);
 }
 
-// Same plan, same seed, same rules: the recorded game must be the dry run's game.
+// Same plan, same seed, same rules: the recorded session must be the dry run's session.
 const same = (await Deno.readTextFile(`${out}/log.txt`)) === dryLog;
 const size = (await Deno.stat(`${outPath}/video.avi`)).size / 1e6;
 const checks = [
