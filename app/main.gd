@@ -43,7 +43,7 @@ var _notice_fade: Tween
 
 
 func _ready() -> void:
-	_load_meshes()
+	meshes = Stage.load_kit()
 	_load_sounds()
 	stage = Stage.new(meshes)
 	add_child(stage)
@@ -175,26 +175,6 @@ func _show(next: Session) -> void:
 	hero.reset(session.dragon.body)
 	_draw_rival(0.0, 0.0)
 	camera.position = _center(session.dragon.body[0]) + CAMERA_OFFSET
-
-
-## art/dragon_kit.glb holds one object per piece: head, straight, turn, tail, food,
-## pickup, and (in newer kits) floor and wall.
-func _load_meshes() -> void:
-	var kit: Node = load("res://art/dragon_kit.glb").instantiate()
-	for child in kit.find_children("*", "MeshInstance3D"):
-		meshes[String(child.name)] = child.mesh
-		_use_vertex_colors(child.mesh)
-	kit.free()
-
-
-## glTF says vertex colors (COLOR_0) tint the base color, but Godot's importer
-## only turns that on for some materials. Blender bakes groove shading and stone
-## mottling into vertex colors, so switch it on wherever a surface has them.
-func _use_vertex_colors(mesh: Mesh) -> void:
-	for surface in mesh.get_surface_count():
-		var material := mesh.surface_get_material(surface) as BaseMaterial3D
-		if material and mesh.surface_get_arrays(surface)[Mesh.ARRAY_COLOR] != null:
-			material.vertex_color_use_as_albedo = true
 
 
 ## sfx/*.wav come from tools/build_sfx.py.

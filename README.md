@@ -15,6 +15,7 @@ habits as D3. The dragon moves and turns; food, growth, and collisions are yours
 | Make the art | `deno task art` | Runs `tools/build_art.py` with Blender as a Python library (`bpy`), writes `art/*.glb` |
 | Make the art on an Intel Mac | `deno task art:lts` | Same script, Blender 4.5 LTS |
 | Check this computer | `deno task doctor` | Tries every step and prints a report to paste into Canvas |
+| See the kit in the game's lighting | `deno task kit` | Every piece in rows, plus the hero and the rival bending through turns on a board with every tile kind |
 | Play it | `deno task dev` | Runs the game in a native window |
 | Open the editor | `deno task edit` | The graphical editor is still there when you want it |
 | Playtest with an agent | `deno task playtest playtests/ford-embers.replay` | Plays a plan through the game, records `video.avi`, a log, and snapshots (see PLAYTEST.md) |
@@ -22,7 +23,27 @@ habits as D3. The dragon moves and turns; food, growth, and collisions are yours
 | See the web build | `deno task preview` | Serves `dist/` locally |
 
 Push to `main` and `.github/workflows/deploy.yml` runs the same `deno task ci`
-on GitHub and deploys `dist/` to Pages.
+on GitHub and deploys `dist/` to Pages. The optional review bot
+(`.github/workflows/review-bot.yml`, guided by `REVIEWBOT.md`) comments on each push
+once it is set up; until then it shows a red X that says nothing about the code.
+
+## Editor
+
+Open this folder in VS Code and accept the recommended extensions
+(`.vscode/extensions.json`):
+
+- **godot-tools:** GDScript completion, hover docs, and go-to-definition. It starts a
+  windowless Godot from `.tools/godot` (made by `deno task setup`), so no editor needs
+  to be open. Format GDScript with `deno task fmt`, not this extension.
+- **Python:** completion for `bpy` and `bmesh` in `tools/build_art.py`, from Blender 5.2
+  stubs that `deno task setup` installs into `.tools/python-stubs`.
+- **GLB Viewer:** click `art/dragon_kit.glb` to orbit the kit. `build_art.py` lays the
+  pieces out in rows (the dragon, the rival, props, then tile kinds) just for viewers
+  like this; the game uses only each piece's mesh, so the layout never affects play.
+- **Deno:** for the TypeScript in `scripts/`.
+
+`Cmd/Ctrl+Shift+B` runs `deno task ci`. The tasks list (`.vscode/tasks.json`) also
+plays, shows the kit, rebuilds art and sound, and playtests the plan open in the editor.
 
 ## Releasing
 
@@ -43,6 +64,8 @@ played in the browser" on the uploaded `html5` channel once.
 
 ## Layout
 
+- `DESIGN.md`: the words the project uses and one section per menu item. `AGENTS.md`
+  is a map for coding agents; `REVIEWBOT.md` guides the optional review bot.
 - `project.godot`, `main.tscn`, `export_presets.cfg`: Godot's own config, plain text, editable by hand.
 - `core/session.gd`: one run at one level: food, score, collisions, powerups, and the rival.
   No Nodes; tested headless.
@@ -55,9 +78,10 @@ played in the browser" on the uploaded `html5` channel once.
   them (`campaign.gd`); `levels/README.md` is the legend and the rules reference.
 - `core/kit.gd`: which piece (head, straight, turn, tail) goes in each cell and how far to rotate it.
 - `app/main.gd`: the engine adapter. Builds the stage in code, ticks the session, draws the
-  dragons and the HUD.
-- `tools/build_art.py`: Blender as code. The dragon kit is drawn as ASCII voxel layers; edit, run
-  `deno task art`, replay.
+  dragons and the HUD. `app/stage.gd` loads the kit and draws the board;
+  `app/kit_viewer.gd` is `deno task kit`.
+- `tools/build_art.py`: Blender as code. Every piece is swept, beveled, and painted by a small
+  builder function; edit, run `deno task art`, replay. `tools/build_sfx.py` does the same for sound.
 - `playtests/`: plans for agentic playtests and the driver that plays them; evidence
   lands in `playtests/out/` (not committed). Agents start at `PLAYTEST.md`.
 - `tests/`: `*_test.gd` files, run by `tests/run_tests.gd` (a tiny runner, no plugin).

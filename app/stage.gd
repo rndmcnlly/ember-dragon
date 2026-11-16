@@ -27,6 +27,31 @@ var _stale := false
 var _skirt := _make_skirt()
 
 
+## art/dragon_kit.glb holds one object per piece: the dragon's head, straight, turn,
+## and tail, the rival's versions (rival_head, ...), food, pickup, and one per tile
+## kind in Board.TILES. Returns piece name -> Mesh. Only the meshes matter: where
+## build_art.py placed each object (in rows, so the .glb previews well in a model
+## viewer) is ignored.
+static func load_kit() -> Dictionary:
+	var meshes := {}
+	var kit: Node = load("res://art/dragon_kit.glb").instantiate()
+	for child in kit.find_children("*", "MeshInstance3D"):
+		meshes[String(child.name)] = child.mesh
+		_use_vertex_colors(child.mesh)
+	kit.free()
+	return meshes
+
+
+## glTF says vertex colors (COLOR_0) tint the base color, but Godot's importer
+## only turns that on for some materials. Blender bakes groove shading and stone
+## mottling into vertex colors, so switch it on wherever a surface has them.
+static func _use_vertex_colors(mesh: Mesh) -> void:
+	for surface in mesh.get_surface_count():
+		var material := mesh.surface_get_material(surface) as BaseMaterial3D
+		if material and mesh.surface_get_arrays(surface)[Mesh.ARRAY_COLOR] != null:
+			material.vertex_color_use_as_albedo = true
+
+
 ## meshes maps kind names to the kit's meshes. A new kind needs a mesh, not new code here.
 func _init(meshes: Dictionary) -> void:
 	_kit = meshes

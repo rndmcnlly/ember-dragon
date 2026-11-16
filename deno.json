@@ -1,11 +1,13 @@
 {
   "tasks": {
-    "setup": "deno run -A scripts/godot.ts setup",
+    "setup": "deno run -A scripts/godot.ts setup && deno task setup:stubs",
+    "setup:stubs": "uv pip install --quiet --python 3.13 --target .tools/python-stubs fake-bpy-module-5.2==20260730",
     "art": "uv run --script tools/build_art.py",
     "art:lts": "uv run --no-project --python 3.11 --with \"bpy==4.5.*\" python tools/build_art.py",
     "sfx": "uv run --script tools/build_sfx.py",
     "edit": "deno run -A scripts/godot.ts -- --editor --path .",
     "dev": "deno run -A scripts/godot.ts -- --path .",
+    "kit": "deno run -A scripts/godot.ts -- --path . res://app/kit_viewer.tscn",
     "import": "deno run -A scripts/godot.ts -- --headless --path . --import",
     "test": "deno run -A scripts/godot.ts -- --headless --path . --script res://tests/run_tests.gd",
     "lint": "uvx --from gdtoolkit==4.5.0 gdlint core app levels tests playtests",

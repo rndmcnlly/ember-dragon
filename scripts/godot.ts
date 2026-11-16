@@ -136,6 +136,17 @@ async function extractRemoteEntry(url: string, name: string): Promise<Uint8Array
   throw new Error(`${name} not found in ${url}`);
 }
 
+// One path that works on every platform, for tools like VS Code's godot-tools
+// (.vscode/settings.json points at .tools/godot). Its own _sc_ keeps editor data
+// in .tools/editor_data, the same place the real binary keeps it.
+async function linkForEditors() {
+  const link = `${TOOLS}godot${Deno.build.os === "windows" ? ".exe" : ""}`;
+  await Deno.remove(link).catch(() => {});
+  if (Deno.build.os === "windows") await Deno.link(godotPath(), link); // symlinks need admin
+  else await Deno.symlink(godotPath(), link);
+  await Deno.writeTextFile(`${TOOLS}_sc_`, "");
+}
+
 async function setup() {
   if (Deno.env.get("GODOT")) {
     await Deno.stat(godotPath()); // throws NotFound if GODOT points nowhere
@@ -151,14 +162,18 @@ async function setup() {
     console.log(`Godot ${VERSION} already in .tools/`);
   } catch {
     const zip = `${TOOLS}godot.zip`;
-    await download(`${RELEASE}/Godot_v${VERSION}-stable_${zipName}`, zip);
-    await unzip(zip, TOOLS);
-    await Deno.remove(zip);
+    try {
+      await download(`${RELEASE}/Godot_v${VERSION}-stable_${zipName}`, zip);
+      await unzip(zip, TOOLS);
+    } finally {
+      await Deno.remove(zip).catch(() => {}); // never leave 170 MB behind
+    }
   }
   // "_sc_" next to the binary means self-contained mode: editor settings and
   // export templates live in .tools/editor_data/, not your home directory.
   const binaryDir = godotPath().replace(/[^/\\]+$/, "");
   await Deno.writeTextFile(`${binaryDir}_sc_`, "");
+  await linkForEditors();
   const templates = `${TOOLS}editor_data/export_templates/${VERSION}.stable/`;
   const template = "web_nothreads_release.zip";
   try {

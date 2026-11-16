@@ -100,6 +100,10 @@ The adapter is now three files: `app/main.gd` (loop, input, dragon, HUD),
   Its listeners read the Session from a field instead of capturing it: a lambda that
   captures the Session it listens to is a cycle RefCounted never frees, and every
   finished game used to stay in memory (`tests/effects_test.gd` guards this).
+- **The kit on its own:** `deno task kit` shows every piece in a row, and both dragons
+  bending through turns on a board with every tile kind, in the game's lighting. It
+  loads the kit with the same `Stage.load_kit()` and draws with the same `Stage` and
+  `DragonView` as the game, so what looks wrong there looks wrong in play.
 - **Not available on the web renderer:** screen-space reflections, volumetric fog,
   depth of field, and glow levels or blend modes. We left them out.
 
@@ -504,6 +508,6 @@ the skip notice. With an itch.io account, add the secret and the variable, add a
 | Replays | Systems | `core/replay.gd`, `core/controllers/player_controller.gd`, `core/campaign.gd` (`Step.play`), `tests/replay_test.gd`, `tests/golden.replay` |
 | Procedural terrain | Content | `core/terrain.gd`, `core/campaign.gd` (`wilds`, `load_level`), `levels/wilds.rules`, `tests/terrain_test.gd`, `tests/golden-wilds.txt` |
 | Sound as code | Content | `tools/build_sfx.py`, `sfx/` |
-| Showcase art | Content | `tools/build_art.py`, `art/`, `app/stage.gd`, `app/effects.gd` |
+| Showcase art | Content | `tools/build_art.py`, `art/`, `app/stage.gd`, `app/effects.gd`, `app/kit_viewer.gd` (`deno task kit`) |
 | Release pipeline | Process | `.github/workflows/release.yml`, `CHANGELOG.md`, `README.md` (Releasing) |
 | Agentic playtest | Process | `PLAYTEST.md`, `scripts/playtest.ts`, `playtests/`, `tests/playtest_test.gd` |

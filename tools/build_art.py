@@ -586,9 +586,10 @@ def weld_seams(mesh, seams):
     mesh.normals_split_custom_set(normals)
 
 
-def make_object(name, build):
+def make_object(name, build, location=(0, 0, 0)):
     """Run a builder on a fresh bmesh and turn the result into a mesh object called name.
-    A builder returns the open ends of its tubes as (ring of vertices, center) pairs."""
+    A builder returns the open ends of its tubes as (ring of vertices, center) pairs.
+    The game uses only the mesh; location just spreads the kit out for model viewers."""
     bm = bmesh.new()
     bm.loops.layers.float_color.new("Col")
     seams = build(bm)
@@ -609,7 +610,9 @@ def make_object(name, build):
         mesh.color_attributes.active_color_index = 0
         mesh.color_attributes.render_color_index = 0
     weld_seams(mesh, seam_centers)
-    bpy.context.scene.collection.objects.link(bpy.data.objects.new(name, mesh))
+    obj = bpy.data.objects.new(name, mesh)
+    obj.location = location
+    bpy.context.scene.collection.objects.link(obj)
 
 
 # The rival: the same shapes in obsidian and crimson ----------------------------------------
@@ -643,11 +646,12 @@ PIECES = {  # the dragon kit; the Godot side finds each mesh by these names
     "straight": build_straight,
     "turn": build_turn,
     "tail": build_tail,
+}
+RIVAL_PIECES = {"rival_" + name: rival(build) for name, build in PIECES.items()}  # rival_head, ...
+PROPS = {  # things on the board that are neither dragon nor ground
     "food": build_food,
     "pickup": build_pickup,
 }
-for piece in ("head", "straight", "turn", "tail"):  # rival_head, rival_straight, ...
-    PIECES["rival_" + piece] = rival(PIECES[piece])
 TILES = {  # one entry per kind of ground; a new kind is one build_ function and one line here
     "floor": build_floor,
     "wall": build_wall,
@@ -656,8 +660,12 @@ TILES = {  # one entry per kind of ground; a new kind is one build_ function and
     "bridge": build_bridge,
 }
 
-for name, build in (PIECES | TILES).items():
-    make_object(name, build)
+# One row per registry, so a GLB viewer shows a tidy catalog instead of every piece
+# stacked on the origin. Each mesh is still modeled around its own cell's center.
+SPACING = 1.5
+for row, registry in enumerate([PIECES, RIVAL_PIECES, PROPS, TILES]):
+    for column, (name, build) in enumerate(registry.items()):
+        make_object(name, build, location=(column * SPACING, -row * SPACING, 0))
 
 bpy.ops.export_scene.gltf(
     filepath="art/dragon_kit.glb", export_apply=True, export_cameras=False, export_lights=False

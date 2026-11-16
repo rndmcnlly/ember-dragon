@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Play (deno task dev)", "type": "shell", "command": "deno", "args": ["task", "dev"], "problemMatcher": [] },
+    { "label": "See the kit (deno task kit)", "type": "shell", "command": "deno", "args": ["task", "kit"], "problemMatcher": [] },
+    { "label": "Rebuild art (deno task art)", "type": "shell", "command": "deno", "args": ["task", "art"], "problemMatcher": [] },
+    { "label": "Rebuild sounds (deno task sfx)", "type": "shell", "command": "deno", "args": ["task", "sfx"], "problemMatcher": [] },
+    {
+      // Open a plan (playtests/*.replay) first: these play the file in the active editor.
+      "label": "Playtest this plan, dry run (deno task playtest --dry)",
+      "type": "shell",
+      "command": "deno",
+      "args": ["task", "playtest", "${relativeFile}", "--dry"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Playtest this plan, recorded (deno task playtest)",
+      "type": "shell",
+      "command": "deno",
+      "args": ["task", "playtest", "${relativeFile}"],
+      "problemMatcher": []
+    },
+    {
+      "label": "CI check (deno task ci)",
+      "type": "shell",
+      "command": "deno",
+      "args": ["task", "ci"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    }
+  ]
+}
