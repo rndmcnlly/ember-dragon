@@ -1,19 +1,17 @@
-## The dragon's rules on the grid: no Nodes, no engine callbacks, testable headless.
+## The dragon's body and steering. The Arena decides what it may run into.
 class_name Dragon
 extends RefCounted
 
 const MAX_QUEUED_TURNS := 2
+const MIN_LENGTH := 2
 
-var size: Vector2i
 var body: Array[Vector2i] = []  # head first
 var heading := Vector2i.RIGHT
 var _turns: Array[Vector2i] = []  # turns wait here until the next tick (Command)
+var _growth := 0  # cells still to grow, one per tick
 
 
-func _init(grid_size: Vector2i, length := 4) -> void:
-	size = grid_size
-	@warning_ignore("integer_division")  # the middle cell, rounded down, on purpose
-	var start := grid_size / 2
+func _init(start: Vector2i, length := 4) -> void:
 	for i in length:
 		body.append(start - heading * i)
 
@@ -27,11 +25,33 @@ func turn(direction: Vector2i) -> void:
 	_turns.append(direction)
 
 
-## Advance one cell, taking the next queued turn first. Wrapping around the grid is a
-## placeholder: once Session ends the run at solid tiles, the dragon never reaches an edge.
-func tick() -> void:
+## Apply the next queued turn and return the cell the head is about to enter.
+func steer() -> Vector2i:
 	if not _turns.is_empty():
 		heading = _turns.pop_front()
-	var head := body[0] + heading
-	body.push_front(Vector2i(posmod(head.x, size.x), posmod(head.y, size.y)))
-	body.pop_back()
+	return body[0] + heading
+
+
+## Move the head forward; the tail follows unless the dragon is still growing.
+func advance() -> void:
+	body.push_front(body[0] + heading)
+	if _growth > 0:
+		_growth -= 1
+	else:
+		body.pop_back()
+
+
+func grow(cells: int) -> void:
+	_growth += cells
+
+
+func shrink(cells: int) -> void:
+	for i in mini(cells, body.size() - MIN_LENGTH):
+		body.pop_back()
+
+
+## Whether the head would hit the body by entering this cell. The tail tip is
+## safe when it is about to move away, so a dragon may chase its own tail.
+func blocks(cell: Vector2i) -> bool:
+	var solid := body.size() if _growth > 0 else body.size() - 1
+	return body.slice(0, solid).has(cell)
