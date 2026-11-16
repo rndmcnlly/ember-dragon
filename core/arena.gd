@@ -7,6 +7,8 @@ signal ate(cell: Vector2i)
 signal powered(powerup: Powerup)
 signal died(reason: String)
 signal won
+signal ticked  # after every tick of play; levels' rules listen (see Rulebook)
+signal announced(text: String)  # a message for the player, from a level's rules
 
 enum State { READY, PLAYING, OVER, WON }
 
@@ -22,6 +24,7 @@ var pickup: Powerup = null  # waiting on the board at pickup_cell
 var pickup_cell := Vector2i(-1, -1)
 var active: Array[Powerup] = []
 var score := 0
+var ticks := 0  # ticks of play since the first move
 var goal := 0  # embers that clear the level; 0 means endless (Campaign.Step sets it)
 var state := State.READY
 var death := ""
@@ -70,6 +73,9 @@ func tick() -> void:
 		_activate(pickup)
 		pickup = null
 	_age_powerups()
+	ticks += 1
+	if state == State.PLAYING:
+		ticked.emit()
 
 
 func _eat() -> void:
@@ -84,6 +90,35 @@ func _eat() -> void:
 	if pickup == null and not pickup_kinds.is_empty() and rng.randf() < PICKUP_CHANCE:
 		pickup = pickup_kinds[rng.randi_range(0, pickup_kinds.size() - 1)].new()
 		pickup_cell = _empty_cell()
+
+
+func announce(text: String) -> void:
+	announced.emit(text)
+
+
+## Put the ember somewhere new.
+func move_food() -> void:
+	food = _empty_cell()
+
+
+## Put a pickup of this kind on the board, replacing any waiting one.
+func drop(kind: GDScript) -> void:
+	pickup = kind.new()
+	pickup_cell = _empty_cell()
+
+
+## Open ground with nothing on it: where embers, pickups, and spreading tiles may go.
+## (A rival dragon would be checked here too.)
+func is_clear(cell: Vector2i) -> bool:
+	var taken := dragon.body.has(cell) or cell == food or cell == pickup_cell
+	return board.spawns_at(cell) and not taken
+
+
+## Whether a cell is within reach of the head in a few moves; changing the ground
+## there would be a trap the player could not see coming.
+func near_head(cell: Vector2i, moves := 3) -> bool:
+	var gap := (cell - dragon.body[0]).abs()
+	return gap.x + gap.y <= moves
 
 
 func _activate(powerup: Powerup) -> void:
@@ -111,13 +146,12 @@ func _die(reason: String) -> void:
 	died.emit(reason)
 
 
-## A random cell where food or a pickup may appear: open ground with nothing on it.
+## A random clear cell for food or a pickup.
 func _empty_cell() -> Vector2i:
 	while true:
 		var cell := Vector2i(
 			rng.randi_range(0, board.size.x - 1), rng.randi_range(0, board.size.y - 1)
 		)
-		var taken := dragon.body.has(cell) or cell == food or cell == pickup_cell
-		if not taken and board.spawns_at(cell):
+		if is_clear(cell):
 			return cell
 	return Vector2i.ZERO

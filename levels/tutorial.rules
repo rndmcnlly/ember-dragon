@@ -1,0 +1,4 @@
+# First Flight teaches by talking. The dragon flies about nine ticks a second.
+at tick 3: say "Embers make you longer. Your own tail is the danger now."
+at score 2: say "The pond is safe, just slow. Try wading through it."
+at score 4: say "One more ember clears the meadow."

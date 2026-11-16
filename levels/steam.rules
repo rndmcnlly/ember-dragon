@@ -1,0 +1,5 @@
+# Fire Meets Water: the river creeps outward until steam cools the lava.
+at tick 3: say "The river is rising."
+every 50 ticks: spread water 1
+at score 6: say "Steam! The lava cools to stone."
+at score 6: replace lava with floor

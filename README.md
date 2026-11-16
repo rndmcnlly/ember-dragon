@@ -27,6 +27,8 @@ on GitHub and deploys `dist/` to Pages.
 
 - `project.godot`, `main.tscn`, `export_presets.cfg`: Godot's own config, plain text, editable by hand.
 - `core/dragon.gd`: the dragon's rules on the grid (movement, a turn queue). No Nodes; tested headless.
+- `levels/`: maps (`*.txt`), event scripts (`*.rules`), and the campaign that orders
+  them (`campaign.gd`); `levels/README.md` is the legend and the rules reference.
 - `core/kit.gd`: which piece (head, straight, turn, tail) goes in each cell and how far to rotate it.
 - `game/main.gd`: the engine adapter. Builds the stage in code, ticks the dragon, draws it with
   four shared meshes.

@@ -4,6 +4,8 @@
 class_name Board
 extends RefCounted
 
+signal changed(cells: Array)  # tiles changed during play; the Stage redraws
+
 ## What each tile kind means to the rules. Every row has every column, so the table
 ## reads like a spreadsheet:
 ##   solid   the head cannot enter; it crashes against the tile
@@ -34,6 +36,38 @@ static func bordered(grid_size: Vector2i) -> Board:
 			var edge := x == 0 or y == 0 or x == grid_size.x - 1 or y == grid_size.y - 1
 			board.tiles[Vector2i(x, y)] = "wall" if edge else "floor"
 	return board
+
+
+## A fresh copy to play on, so changes during one game never reach the next.
+func copy() -> Board:
+	var board := Board.new()
+	board.size = size
+	board.tiles = tiles.duplicate()
+	board.start = start
+	board.facing = facing
+	return board
+
+
+## Change many cells at once and tell listeners once.
+func set_kinds(cells: Array, kind: String) -> void:
+	for cell in cells:
+		tiles[cell] = kind
+	if not cells.is_empty():
+		changed.emit(cells)
+
+
+## Every cell the dragon could fly to from here, avoiding walls and lava (a flood fill).
+func reachable(from: Vector2i) -> Dictionary:
+	var seen := {from: true}
+	var frontier: Array[Vector2i] = [from]
+	while not frontier.is_empty():
+		var cell: Vector2i = frontier.pop_back()
+		for step in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+			var next: Vector2i = cell + step
+			if not (seen.has(next) or is_solid(next) or is_deadly(next)):
+				seen[next] = true
+				frontier.append(next)
+	return seen
 
 
 func kind_at(cell: Vector2i) -> String:

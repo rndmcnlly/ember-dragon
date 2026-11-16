@@ -22,6 +22,8 @@ const FALLBACK_COLORS := {"floor": Color("9c8a6c"), "wall": Color("4d4038")}
 var _kit: Dictionary  # kind name -> the kit's Mesh
 var _ready_meshes := {}  # kind name -> that mesh, tintable and animated, made once
 var _tiles := Node3D.new()
+var _board: Board  # the board on show; when its tiles change, we redraw next frame
+var _stale := false
 var _skirt := _make_skirt()
 
 
@@ -34,8 +36,13 @@ func _init(meshes: Dictionary) -> void:
 	add_child(_tiles)
 
 
-## Draw every tile of a board, replacing whatever was drawn before.
+## Draw every tile of a board, replacing whatever was drawn before, and keep watching
+## it: a level's rules may change tiles during play.
 func draw_board(board: Board) -> void:
+	if _board != board:
+		_board = board
+		board.changed.connect(func(_cells): _stale = true)
+	_stale = false
 	for old in _tiles.get_children():
 		old.free()
 	var cells_of := {}  # kind -> the cells that hold it
@@ -44,6 +51,12 @@ func draw_board(board: Board) -> void:
 	for kind in cells_of:
 		_tiles.add_child(_scatter(kind, cells_of[kind], board))
 	_skirt.position = Vector3(board.size.x / 2.0, -0.2, board.size.y / 2.0)
+
+
+## Several rules can change tiles in one tick; one redraw a frame covers them all.
+func _process(_delta: float) -> void:
+	if _stale:
+		draw_board(_board)
 
 
 ## Sky, ambient light, tonemapping, glow, ambient occlusion, and fog in one resource.

@@ -18,6 +18,7 @@ class Step:
 	var goal := 0  # embers to clear the level; 0 means fly for as long as you like
 	var pickups: Array[GDScript] = [HastePowerup, GhostPowerup, TrimPowerup]  # all, unless told
 	var tempo := 1.0  # the level's base speed; Haste and water multiply it
+	var rules := ""  # a file in levels/, without .rules, scripting events (see Rulebook)
 
 	## Tune a fresh Arena to this step.
 	func prepare(arena: Arena) -> void:
@@ -62,6 +63,12 @@ func without_pickups() -> Campaign:
 ## Fly this much faster than normal for the whole level (1.2 is 20% faster).
 func faster(factor: float) -> Campaign:
 	_latest().tempo = factor
+	return self
+
+
+## Script the level's events with a rules file from levels/, e.g. "eruption".
+func with_rules(file: String) -> Campaign:
+	_latest().rules = file
 	return self
 
 

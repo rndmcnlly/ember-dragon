@@ -18,6 +18,7 @@ const DIRECTIONS := {
 var campaign: Campaign = preload("res://levels/campaign.gd").ember_trail()
 var step: Campaign.Step  # where we are in the campaign
 var level: Level  # that step's map
+var problems: Array[String] = []  # mistakes in the level or rules file, shown on the banner
 var arena: Arena
 var stage: Stage
 var meshes := {}  # piece name -> Mesh, shared by every node that shows it (Flyweight)
@@ -30,6 +31,7 @@ var camera := Camera3D.new()
 var effects := Effects.new(camera)
 var score_label := Label.new()
 var banner := Label.new()
+var notice := Label.new()  # what the level's rules say during play
 var _clock := 0.0
 var _previous: Array[Vector2i] = []  # the body before the latest tick, to draw in-between
 var _head_yaw := 0.0
@@ -85,17 +87,24 @@ func _process(delta: float) -> void:
 func _load_level(index: int) -> void:
 	step = campaign.steps[index]
 	level = Level.load_file("res://levels/%s.txt" % step.map)
-	for error in level.errors:
-		push_warning(error)
 	if not level.errors.is_empty():
 		level.board = Board.bordered(Vector2i(42, 42))
-	stage.draw_board(level.board)
 	_new_game()
 
 
 func _new_game() -> void:
-	arena = Arena.new(level.board, randi())
+	arena = Arena.new(level.board.copy(), randi())  # a copy: rules may change the ground
 	step.prepare(arena)
+	problems = level.errors.duplicate()
+	if not step.rules.is_empty():
+		var rulebook := Rulebook.load_file("res://levels/%s.rules" % step.rules)
+		rulebook.attach(arena)
+		problems.append_array(rulebook.errors)
+	for problem in problems:
+		push_warning(problem)
+	stage.draw_board(arena.board)
+	arena.announced.connect(_announce)
+	notice.modulate.a = 0.0
 	arena.ate.connect(func(_cell): sounds["eat"].play())
 	arena.powered.connect(func(_powerup): sounds["power"].play())
 	arena.died.connect(func(_reason): sounds["crash"].play())
@@ -159,7 +168,7 @@ func _build_props() -> void:
 
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
-	for label in [score_label, banner]:
+	for label in [score_label, banner, notice]:
 		label.add_theme_color_override("font_color", Color("fff4e0"))
 		label.add_theme_color_override("font_outline_color", Color("1a1410"))
 		label.add_theme_constant_override("outline_size", 10)
@@ -168,17 +177,35 @@ func _build_hud() -> void:
 		layer.add_child(label)
 	score_label.position = Vector2(20, 14)
 	score_label.add_theme_font_size_override("font_size", 30)
-	# The camera keeps the head at screen center, so messages sit above it.
+	# The camera keeps the head at screen center, so messages sit below it, clear of
+	# the score in the corner.
 	banner.anchor_right = 1.0
 	banner.offset_left = 40
 	banner.offset_right = -40
-	banner.anchor_top = 0.08
-	banner.anchor_bottom = 0.4
+	banner.anchor_top = 0.58
+	banner.anchor_bottom = 0.95
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	banner.add_theme_font_size_override("font_size", 30)
+	banner.add_theme_font_size_override("font_size", 28)
 	banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long level blurbs wrap
+	notice.anchor_right = 1.0
+	notice.anchor_top = 0.72
+	notice.offset_left = 40
+	notice.offset_right = -40
+	notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	notice.add_theme_font_size_override("font_size", 26)
+	notice.add_theme_color_override("font_color", Color("ffd27a"))
 	add_child(layer)
+
+
+## Show a line from the level's rules below the dragon, then let it fade.
+func _announce(text: String) -> void:
+	notice.text = text
+	notice.modulate.a = 1.0
+	var tween := create_tween()
+	tween.tween_interval(3.0)
+	tween.tween_property(notice, "modulate:a", 0.0, 0.8)
 
 
 ## Draw the dragon partway between its last two ticks (t from 0 to 1). The cells in
@@ -257,7 +284,7 @@ func _draw_hud() -> void:
 				level.blurb,
 				"Eat %d embers to clear it" % arena.goal if arena.goal > 0 else "No goal: fly free",
 			]
-			intro.append_array(level.errors)
+			intro.append_array(problems)
 			intro.append("Arrow keys to fly    %s" % _picker())
 			banner.text = "\n".join(intro)
 		Arena.State.OVER:

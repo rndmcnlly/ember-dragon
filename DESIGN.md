@@ -18,6 +18,8 @@ joining the project.
 | piece | one of the kit's models: head, straight, turn, tail | `Kit.Piece` |
 | kit | all pieces, built by `tools/build_art.py` | `art/dragon_kit.glb` |
 | ember | food; eating one scores 1 and grows 3 cells | `Arena.food` |
+| campaign | the levels in order, each with a goal and tuning | `Campaign.steps` |
+| rule | one line of a `.rules` file: when, then what | `Rulebook.Rule` |
 | pickup | a powerup waiting on the board | `Arena.pickup` |
 | effect | a powerup in progress, counting down ticks | `Arena.active` |
 
@@ -56,7 +58,7 @@ joining the project.
   and the dragon used to fly into the wall before anyone was looking.
 - **Ghost can end mid-overlap.** We kept it: the countdown is in the corner, and
   the risk makes the powerup interesting.
-- **Seeded randomness.** `Arena.new(size, seed)` makes food placement repeatable,
+- **Seeded randomness.** `Arena.new(board, seed)` makes food placement (and every rule that rolls dice) repeatable,
   which the tests rely on.
 
 ## Next, if we had another week
@@ -156,6 +158,9 @@ return trail.then_any_other(Level.catalog())
 - **One chain per line, on purpose.** Our first draft was one long chain in
   parentheses; `gdformat` split it into a column of `. eat(5)` lines that read like
   nothing. A statement per level keeps every line a sentence and the formatter happy.
+- **The DSLs meet here.** `.with_rules("eruption")` picks a level's rules file, so
+  the same map can be replayed with different events, and the rules language
+  never needs to know which map it runs on.
 - **Why internal, not another text file?** The campaign refers to code (powerup
   classes), gets autocompletion and type checks for free, and changes rarely. Maps
   change constantly and are drawn by people who should not need GDScript; that is
@@ -167,12 +172,57 @@ return trail.then_any_other(Level.catalog())
 **Try it:** add `trail.level("meadow").eat(30).faster(1.5)` as a sixth line and play
 level 6: the same map, retuned as a speed trial, with no new files.
 
+## External DSL
+
+**Where:** `core/rulebook.gd` (parser and interpreter), `levels/*.rules` (five
+scripts), the language reference at the end of `levels/README.md`,
+`tests/rulebook_test.gd`.
+**Pattern:** Interpreter (GoF). Parsing turns each line into a `Rule` holding a
+`Trigger` and an `Action`; at run time those objects run themselves against the Arena.
+
+```
+# eruption.rules: the caldera wakes as you feed it
+at tick 3: say "The caldera rumbles. Feed quickly."
+every 40 ticks: spread lava 2
+at score 7: say "Rain! The lava hisses into pools."
+at score 7: replace lava with water
+at score 11: place lava from 19,12 to 20,13
+```
+
+- **A verb is a class.** `Say`, `Spread`, `Replace`, `Place`, `Move`, `Drop` each have
+  a static `read(words)` that parses their own grammar and returns an instance or an
+  error message, and a `run(arena)` that does the work. A new verb is one class and
+  one entry in `Rulebook.verbs()`. (This shape came from `gdlint` refusing our first
+  draft's 13-return `match`: the linter was right.)
+- **Errors cite the line** and suggest what was meant:
+  `eruption.rules:4: unknown action "sprad" (try say, spread, replace, place, move, drop)`.
+  Unknown tile kinds are checked against `Board.TILES`, so the language grows with
+  the tile vocabulary for free.
+- **Observer, again.** The Arena now emits `ticked` after each tick of play and
+  `announced` for `say`; `Rulebook.attach(arena)` subscribes. The connection holds the
+  Arena through a `WeakRef`: a lambda capturing the Arena it listens to is a cycle
+  that RefCounted never frees, which our test runner flagged as leaked objects.
+- **The ground can change now**, so `Board.set_kinds()` emits `changed`. The Stage
+  redraws at most once a frame (seeded per cell, so nothing shuffles), Effects puffs
+  sparks where a few tiles changed and flashes the screen when many did, and each
+  game plays on `level.board.copy()`, so a retry starts from the map as drawn.
+- **Fair by construction.** `spread` refuses any cell whose loss would cut the
+  dragon off from ground it could reach (a flood fill before and after, via
+  `Board.reachable`), and no rule drops lava or walls within three moves of the
+  head. Randomness comes from the Arena's seeded `rng`, so a replay of the same
+  seed and turns sees the same eruption.
+
+**Try it:** play The Caldera (5): lava creeps every few seconds, rain at 7 embers
+turns the ring into a lake, and at 11 the island cracks open. Then break a line in
+`eruption.rules` and watch the title banner name it.
+
 ## Menu
 
 | Item | Group | Files |
 | --- | --- | --- |
 | Levels in text files | Language | `levels/`, `core/level.gd`, `core/board.gd`, `tests/level_test.gd` |
 | Internal DSL | Language | `core/campaign.gd`, `levels/campaign.gd`, `tests/campaign_test.gd` |
+| External DSL | Language | `core/rulebook.gd`, `levels/*.rules`, `levels/README.md`, `tests/rulebook_test.gd` |
 | Powerups | Systems | `core/powerup.gd`, `core/powerups/` |
 | Sound as code | Content | `tools/build_sfx.py`, `sfx/` |
 | Showcase art | Content | `tools/build_art.py`, `art/`, `game/stage.gd`, `game/effects.gd` |

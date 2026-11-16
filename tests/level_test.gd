@@ -71,22 +71,8 @@ func test_every_level_is_clean_and_reachable() -> void:
 	for level_name in names:
 		var level := Level.load_file("res://levels/%s.txt" % level_name)
 		assert_eq(level.errors, [] as Array[String])
-		var reached := _reachable(level.board)
+		var reached := level.board.reachable(level.board.start)
 		for cell in level.board.tiles:
 			if level.board.spawns_at(cell) and not reached.has(cell):
 				failures.append("%s: ember spot %s cannot be reached" % [level_name, cell])
 				break
-
-
-func _reachable(board: Board) -> Dictionary:
-	var seen := {board.start: true}
-	var frontier: Array[Vector2i] = [board.start]
-	while not frontier.is_empty():
-		var cell: Vector2i = frontier.pop_back()
-		for step in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
-			var next: Vector2i = cell + step
-			if seen.has(next) or board.is_solid(next) or board.is_deadly(next):
-				continue
-			seen[next] = true
-			frontier.append(next)
-	return seen

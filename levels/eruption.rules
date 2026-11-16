@@ -1,0 +1,7 @@
+# The Caldera wakes as you feed it. Rain gives you a breather, then it erupts again.
+at tick 3: say "The caldera rumbles. Feed quickly."
+every 40 ticks: spread lava 2
+at score 7: say "Rain! The lava hisses into pools."
+at score 7: replace lava with water
+at score 11: say "The heart of the mountain breaks open!"
+at score 11: place lava from 19,12 to 20,13

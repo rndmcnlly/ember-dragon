@@ -8,6 +8,7 @@ const EMBER := Color(1.0, 0.45, 0.12)
 const ARCANE := Color(0.65, 0.35, 1.0)
 const BLOOD := Color(1.0, 0.15, 0.1)
 const GOLD := Color(1.0, 0.8, 0.3)
+const TILE_SPARKS := {"lava": EMBER, "water": Color(0.45, 0.75, 1.0), "wall": Color(0.7, 0.62, 0.5)}
 const MAX_SHAKE := 0.5  # camera offset in meters at full trauma
 
 var camera: Camera3D
@@ -33,6 +34,16 @@ func watch(arena: Arena) -> void:
 		func(_powerup):
 			_burst(_center(arena.dragon.body[0]), ARCANE, 40, 6.0)
 			_flash_screen(ARCANE, 0.25)
+	)
+	# Rules changed the ground: a puff where a few tiles changed, a flash when many did.
+	arena.board.changed.connect(
+		func(cells):
+			var color: Color = TILE_SPARKS.get(arena.board.kind_at(cells[0]), GOLD)
+			if cells.size() > 6:
+				_flash_screen(color, 0.3)
+				return
+			for cell in cells:
+				_burst(_center(cell), color, 14, 3.0)
 	)
 	arena.won.connect(
 		func():

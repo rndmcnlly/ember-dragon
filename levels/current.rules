@@ -1,0 +1,3 @@
+# The Ford: embers drift on the current, so the slow way round costs you.
+at tick 3: say "Embers drift if you dawdle. The bridges are quicker than wading."
+every 90 ticks: move ember

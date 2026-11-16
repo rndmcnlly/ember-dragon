@@ -1,0 +1,5 @@
+# Cinder Steps: Haste keeps turning up, and Haste near lava is a dare.
+at tick 3: say "Stone runs through the lava river in two places. Find them."
+every 120 ticks: drop haste
+at score 6: say "Getting long? Trim helps."
+at score 6: drop trim
