@@ -7,6 +7,7 @@ extends Node3D
 const EMBER := Color(1.0, 0.45, 0.12)
 const ARCANE := Color(0.65, 0.35, 1.0)
 const BLOOD := Color(1.0, 0.15, 0.1)
+const GOLD := Color(1.0, 0.8, 0.3)
 const MAX_SHAKE := 0.5  # camera offset in meters at full trauma
 
 var camera: Camera3D
@@ -32,6 +33,11 @@ func watch(arena: Arena) -> void:
 		func(_powerup):
 			_burst(_center(arena.dragon.body[0]), ARCANE, 40, 6.0)
 			_flash_screen(ARCANE, 0.25)
+	)
+	arena.won.connect(
+		func():
+			_burst(_center(arena.dragon.body[0]), GOLD, 90, 8.0)
+			_flash_screen(GOLD, 0.3)
 	)
 	arena.died.connect(
 		func(_reason):

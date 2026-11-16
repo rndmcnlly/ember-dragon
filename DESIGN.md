@@ -129,13 +129,50 @@ blurb: Eat embers to grow.
   `export_presets.cfg` adds `levels/*.txt` to the web build.
 
 **Try it:** press 1 to 5 on the title banner to pick a level. Copy `meadow.txt` to
-`mine.txt`, draw something, and it appears as a sixth level after `deno task import`.
+`mine.txt`, draw something, and it appears as a sixth level next time the game runs
+(the campaign adds any map it does not name, endless, at the end).
+
+## Internal DSL
+
+**Where:** `core/campaign.gd` (the builder), `levels/campaign.gd` (the campaign we
+ship, written in it), `tests/campaign_test.gd`.
+**Pattern:** fluent builder, which Fowler calls an internal DSL: ordinary GDScript
+calls, chosen and chained so the code reads like the design doc.
+
+```gdscript
+var trail := Campaign.new("The Ember Trail")
+trail.level("meadow").eat(5).without_pickups()
+trail.level("ford").eat(8).with_pickups([HastePowerup])
+trail.level("cinders").eat(10).with_pickups([HastePowerup, TrimPowerup])
+trail.level("confluence").eat(12).with_pickups([GhostPowerup, TrimPowerup])
+trail.level("caldera").eat(15).faster(1.15)
+return trail.then_any_other(Level.catalog())
+```
+
+- **Each call returns the builder**, so calls chain; `level()` starts a step and the
+  rest tune the latest one. The builder's output is plain data (`Campaign.Step`),
+  and `Step.prepare(arena)` is the only place it touches the rules: the Arena
+  learned `goal`, `tempo`, and a `WON` state, and knows nothing about campaigns.
+- **One chain per line, on purpose.** Our first draft was one long chain in
+  parentheses; `gdformat` split it into a column of `. eat(5)` lines that read like
+  nothing. A statement per level keeps every line a sentence and the formatter happy.
+- **Why internal, not another text file?** The campaign refers to code (powerup
+  classes), gets autocompletion and type checks for free, and changes rarely. Maps
+  change constantly and are drawn by people who should not need GDScript; that is
+  why they are text (see Levels in text files), and why the per-level events below
+  get their own language (see External DSL).
+- **Progression:** eat the goal and the level clears (gold burst, Enter for the
+  next). Number keys still jump anywhere; the last level loops back to the first.
+
+**Try it:** add `trail.level("meadow").eat(30).faster(1.5)` as a sixth line and play
+level 6: the same map, retuned as a speed trial, with no new files.
 
 ## Menu
 
 | Item | Group | Files |
 | --- | --- | --- |
 | Levels in text files | Language | `levels/`, `core/level.gd`, `core/board.gd`, `tests/level_test.gd` |
+| Internal DSL | Language | `core/campaign.gd`, `levels/campaign.gd`, `tests/campaign_test.gd` |
 | Powerups | Systems | `core/powerup.gd`, `core/powerups/` |
 | Sound as code | Content | `tools/build_sfx.py`, `sfx/` |
 | Showcase art | Content | `tools/build_art.py`, `art/`, `game/stage.gd`, `game/effects.gd` |

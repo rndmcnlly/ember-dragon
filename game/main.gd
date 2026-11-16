@@ -15,8 +15,9 @@ const DIRECTIONS := {
 	"ui_right": Vector2i.RIGHT,
 }
 
-var levels := Level.catalog()  # level names, from levels/*.txt
-var level: Level
+var campaign: Campaign = preload("res://levels/campaign.gd").ember_trail()
+var step: Campaign.Step  # where we are in the campaign
+var level: Level  # that step's map
 var arena: Arena
 var stage: Stage
 var meshes := {}  # piece name -> Mesh, shared by every node that shows it (Flyweight)
@@ -48,11 +49,13 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if arena.state != Arena.State.PLAYING and event is InputEventKey and event.pressed:
 		var choice: int = event.keycode - KEY_1  # number keys pick a level
-		if choice >= 0 and choice < mini(levels.size(), 9):
+		if choice >= 0 and choice < mini(campaign.steps.size(), 9):
 			_load_level(choice)
 			return
-	if arena.state == Arena.State.OVER:
-		if event.is_action_pressed("ui_accept"):
+	if arena.state == Arena.State.OVER or arena.state == Arena.State.WON:
+		if event.is_action_pressed("ui_accept") and arena.state == Arena.State.WON:
+			_load_level(_number() % campaign.steps.size())  # the next level, or the first again
+		elif event.is_action_pressed("ui_accept"):
 			_new_game()
 		return
 	for action in DIRECTIONS:
@@ -77,10 +80,11 @@ func _process(delta: float) -> void:
 	_draw_hud()
 
 
-## Read a level from levels/ and draw its ground. A broken file still gives a playable
-## field, with its errors on screen (and in the output) so the designer can fix them.
+## Read a campaign step's map from levels/ and draw its ground. A broken file still
+## gives a playable field, with its errors on screen so the designer can fix them.
 func _load_level(index: int) -> void:
-	level = Level.load_file("res://levels/%s.txt" % levels[index])
+	step = campaign.steps[index]
+	level = Level.load_file("res://levels/%s.txt" % step.map)
 	for error in level.errors:
 		push_warning(error)
 	if not level.errors.is_empty():
@@ -91,9 +95,11 @@ func _load_level(index: int) -> void:
 
 func _new_game() -> void:
 	arena = Arena.new(level.board, randi())
+	step.prepare(arena)
 	arena.ate.connect(func(_cell): sounds["eat"].play())
 	arena.powered.connect(func(_powerup): sounds["power"].play())
 	arena.died.connect(func(_reason): sounds["crash"].play())
+	arena.won.connect(func(): sounds["power"].play())
 	effects.watch(arena)
 	_clock = 0.0
 	_previous = arena.dragon.body.duplicate()
@@ -237,26 +243,42 @@ func _follow(head: Vector3, delta: float) -> void:
 
 
 func _draw_hud() -> void:
-	var lines := [level.title, "Embers  %d" % arena.score]
+	var embers := "Embers  %d" % arena.score
+	if arena.goal > 0:
+		embers += " / %d" % arena.goal
+	var lines := [level.title, embers]
 	for powerup in arena.active:
 		lines.append("%s  %d" % [powerup.title, powerup.remaining])
 	score_label.text = "\n".join(lines)
 	match arena.state:
 		Arena.State.READY:
 			var intro := [
-				"Level %d of %d: %s" % [levels.find(level.name) + 1, levels.size(), level.title],
+				"Level %d of %d: %s" % [_number(), campaign.steps.size(), level.title],
 				level.blurb,
+				"Eat %d embers to clear it" % arena.goal if arena.goal > 0 else "No goal: fly free",
 			]
 			intro.append_array(level.errors)
-			intro.append("Arrow keys to fly    1-%d to pick a level" % levels.size())
+			intro.append("Arrow keys to fly    %s" % _picker())
 			banner.text = "\n".join(intro)
 		Arena.State.OVER:
-			banner.text = (
-				"%s\nEnter to fly again    1-%d to pick a level" % [arena.death, levels.size()]
-			)
+			banner.text = "%s\nEnter to fly again    %s" % [arena.death, _picker()]
+		Arena.State.WON:
+			if _number() < campaign.steps.size():
+				banner.text = "Level clear!\nEnter for level %d    %s" % [_number() + 1, _picker()]
+			else:
+				banner.text = "You finished %s!\nEnter to start again" % campaign.title
 		_:
 			banner.text = ""
 
 
 func _center(cell: Vector2i) -> Vector3:
 	return Vector3(cell.x + 0.5, 0, cell.y + 0.5)
+
+
+## This step's place in the campaign, counting from 1 as the player does.
+func _number() -> int:
+	return campaign.steps.find(step) + 1
+
+
+func _picker() -> String:
+	return "1-%d to pick a level" % mini(campaign.steps.size(), 9)

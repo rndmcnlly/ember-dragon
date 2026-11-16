@@ -6,8 +6,9 @@ extends RefCounted
 signal ate(cell: Vector2i)
 signal powered(powerup: Powerup)
 signal died(reason: String)
+signal won
 
-enum State { READY, PLAYING, OVER }
+enum State { READY, PLAYING, OVER, WON }
 
 const GROWTH_PER_FOOD := 3
 const PICKUP_CHANCE := 0.3  # chance that eating spawns a powerup pickup
@@ -21,9 +22,11 @@ var pickup: Powerup = null  # waiting on the board at pickup_cell
 var pickup_cell := Vector2i(-1, -1)
 var active: Array[Powerup] = []
 var score := 0
+var goal := 0  # embers that clear the level; 0 means endless (Campaign.Step sets it)
 var state := State.READY
 var death := ""
-var speed := 1.0  # ticks per base tick; HastePowerup raises it (see pace())
+var tempo := 1.0  # the level's base speed, from the campaign
+var speed := 1.0  # HastePowerup doubles it
 var ghost := false  # GhostPowerup lets the head pass through the body
 var rng := RandomNumberGenerator.new()
 
@@ -35,10 +38,10 @@ func _init(ground: Board, seed := 0) -> void:
 	food = _empty_cell()
 
 
-## Ticks per base tick right now: Haste's speed times the ground under the head,
-## so wading through water at double speed comes out even.
+## Ticks per base tick right now: the level's tempo, times Haste, times the ground
+## under the head (so wading through water with Haste comes out even).
 func pace() -> float:
-	return speed * board.pace_at(dragon.body[0])
+	return tempo * speed * board.pace_at(dragon.body[0])
 
 
 ## The dragon waits for the player's first move.
@@ -73,8 +76,12 @@ func _eat() -> void:
 	score += 1
 	dragon.grow(GROWTH_PER_FOOD)
 	ate.emit(food)
+	if goal > 0 and score >= goal:
+		state = State.WON
+		won.emit()
+		return
 	food = _empty_cell()
-	if pickup == null and rng.randf() < PICKUP_CHANCE:
+	if pickup == null and not pickup_kinds.is_empty() and rng.randf() < PICKUP_CHANCE:
 		pickup = pickup_kinds[rng.randi_range(0, pickup_kinds.size() - 1)].new()
 		pickup_cell = _empty_cell()
 
