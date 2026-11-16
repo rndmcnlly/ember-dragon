@@ -49,11 +49,27 @@ func _init(ground: Board, seed := 0) -> void:
 	food = _empty_cell()
 
 
-## Ticks per base tick right now: the level's tempo, times Haste, times the ground
-## under the head (so wading through water with Haste comes out even). There is one
-## clock, so a rival flies at the player's pace, in water or out of it.
+## Ticks per base tick right now: the level's tempo, times Haste. This is the clock
+## both dragons share; the ground sets each one's own pace on it (see will_move).
 func pace() -> float:
-	return tempo * speed * board.pace_at(dragon.body[0])
+	return tempo * speed
+
+
+## Whether this dragon moves on the next tick. Every tick adds the pace of the ground
+## under its head to its stride, and a full stride is one cell: on floor that is every
+## tick, in water (pace 0.5) every other tick. One rule for both dragons, so the rival
+## wades like you do, and wading with Haste comes out even.
+func will_move(mover: Dragon) -> bool:
+	return mover.stride + board.pace_at(mover.body[0]) >= 1.0
+
+
+## Take this tick's stride; true if it completes a cell.
+func _stride(mover: Dragon) -> bool:
+	var moves := will_move(mover)
+	mover.stride = minf(mover.stride + board.pace_at(mover.body[0]), 1.0)
+	if moves:
+		mover.stride -= 1.0
+	return moves
 
 
 ## The dragon waits for the player's first move.
@@ -64,15 +80,22 @@ func start() -> void:
 
 ## One step for every dragon at once. Both decide, then both crashes are judged on
 ## where everything was before anyone moved, so neither dragon has the first move.
+## A dragon wading this tick (see will_move) is not steered and stays put: its "next"
+## cell is its own head, so the other can still bump into it.
 func tick() -> void:
 	if state != State.PLAYING:
 		return
 	ticks += 1  # first, so the tick that ends the game counts too
-	controller.steer(self, dragon)
-	if rival != null:
+	var moves := _stride(dragon)
+	var rival_moves := rival != null and _stride(rival)
+	if moves:
+		controller.steer(self, dragon)
+	if rival_moves:
 		rival_controller.steer(self, rival)
-	var next := dragon.steer()
-	var rival_next := rival.steer() if rival != null else NOWHERE
+	var next := dragon.steer() if moves else dragon.body[0]
+	var rival_next := NOWHERE
+	if rival != null:
+		rival_next = rival.steer() if rival_moves else rival.body[0]
 	var crash := _crash(dragon, next, rival_next)
 	if not crash.is_empty():
 		_die("You " + crash)
@@ -81,19 +104,20 @@ func tick() -> void:
 		var rival_crash := _crash(rival, rival_next, next)
 		if not rival_crash.is_empty():
 			_rival_down("The rival " + rival_crash, rival_next)
-	dragon.advance()
-	if rival != null:
+	if moves:
+		dragon.advance()
+	if rival_moves and rival != null:
 		rival.advance()
 	if board.is_deadly(next):  # unlike a wall, the head goes in first
 		_die("You fell into the %s" % board.kind_at(next))
 		return
-	if rival != null and board.is_deadly(rival_next):
+	if rival_moves and rival != null and board.is_deadly(rival_next):
 		_rival_down("The rival fell into the %s" % board.kind_at(rival_next), rival_next)
-	if next == food:
+	if moves and next == food:
 		_eat()
-	elif rival != null and rival_next == food:
+	elif rival_moves and rival != null and rival_next == food:
 		_rival_eat()
-	if pickup != null and next == pickup_cell:  # pickups are the player's alone
+	if moves and pickup != null and next == pickup_cell:  # pickups are the player's alone
 		_activate(pickup)
 		pickup = null
 	_age_powerups()
@@ -103,10 +127,12 @@ func tick() -> void:
 
 ## What goes wrong if this dragon enters the cell while the other dragon's head enters
 ## other_next, as the end of a sentence ("ran into the wall"), or "" if nothing does.
+## A dragon standing still (cell is its own head) can only be bumped into.
 func _crash(mover: Dragon, cell: Vector2i, other_next: Vector2i) -> String:
-	if board.is_solid(cell):
+	var still := cell == mover.body[0]
+	if not still and board.is_solid(cell):
 		return "ran into the %s" % board.kind_at(cell)
-	if mover.blocks(cell) and not (ghost and mover == dragon):
+	if not still and mover.blocks(cell) and not (ghost and mover == dragon):
 		return "bit %s own tail" % ("your" if mover == dragon else "its")
 	var other := opponent(mover)
 	if other == null or ghost:  # Ghost passes through the rival too, both ways
@@ -124,7 +150,7 @@ func _collide(mover: Dragon, cell: Vector2i, other: Dragon, other_next: Vector2i
 		if size == other.body.size():
 			return "met a dragon %s size head-on" % ("your" if mover == dragon else "its")
 		return "met a bigger dragon head-on" if size < other.body.size() else ""
-	if other.blocks(cell):
+	if other.blocks(cell, other_next != other.body[0]):  # a wading tail stays put
 		return "flew into the rival" if mover == dragon else "flew into you"
 	return ""
 

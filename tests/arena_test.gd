@@ -110,15 +110,23 @@ func test_lava_lets_the_head_in_then_ends_the_game() -> void:
 	assert_eq(arena.death, "You fell into the lava")
 
 
+## Haste speeds up the clock; water makes the dragon move on every other tick of it,
+## so wading with Haste comes out even.
 func test_water_halves_the_pace_even_with_haste() -> void:
 	var arena := _started()
 	arena.food = Vector2i(1, 1)
-	arena.board.tiles[arena.dragon.body[0] + Vector2i.RIGHT] = "water"
-	assert_eq(arena.pace(), 1.0)
+	var head := arena.dragon.body[0]
+	for i in 3:
+		arena.board.tiles[head + Vector2i.RIGHT * (i + 1)] = "water"
+	arena.tick()  # into the water at full pace
+	assert_eq(arena.dragon.body[0], head + Vector2i.RIGHT)
+	arena.tick()  # half a stride
+	assert_eq(arena.dragon.body[0], head + Vector2i.RIGHT)
 	arena.tick()
-	assert_eq(arena.pace(), 0.5)
-	arena._activate(HastePowerup.new())
+	assert_eq(arena.dragon.body[0], head + Vector2i.RIGHT * 2)
 	assert_eq(arena.pace(), 1.0)
+	arena._activate(HastePowerup.new())
+	assert_eq(arena.pace(), 2.0)  # twice the ticks, half of them spent wading
 
 
 func test_embers_only_land_where_the_tile_allows() -> void:

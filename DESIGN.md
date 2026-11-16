@@ -12,8 +12,8 @@ joining the project.
 | board | the ground: one tile kind per cell | `Board.tiles` |
 | tile kind | what a cell is made of (floor, wall, lava, water, bridge) and what that means to the rules | `Board.TILES` |
 | level | a map in `levels/*.txt`: headers, then one character per cell | `Level` |
-| pace | how fast the dragon flies right now: Haste times the ground under its head | `Arena.pace()` |
-| tick | one step of the rules; the dragon moves one cell | `Arena.tick()` |
+| pace | how fast the clock runs (tempo times Haste); the ground under each head then decides whether that dragon moves on a tick | `Arena.pace()`, `Arena.will_move()` |
+| tick | one step of the rules; each dragon moves one cell, or half a stride in water | `Arena.tick()` |
 | body | the dragon's cells, head first | `Dragon.body` |
 | piece | one of the kit's models: head, straight, turn, tail | `Kit.Piece` |
 | kit | all pieces, built by `tools/build_art.py` | `art/dragon_kit.glb` |
@@ -116,7 +116,7 @@ blurb: Eat embers to grow.
 
 - **Five tile kinds, four columns.** Wall is `solid` (you crash against it), lava is
   `deadly` (your head goes in first, which is why it reads differently from a wall),
-  water has `pace` 0.5 (Haste in water comes out even), and `spawns` decides where
+  water has `pace` 0.5 (a dragon moves on every other tick there, so Haste in water comes out even), and `spawns` decides where
   embers may land (not in water or lava). Bridges are floor that looks like a bridge:
   their only rule is "not water".
 - **Errors cite the line.** `Level.parse` never crashes and never guesses: a ragged
@@ -257,9 +257,12 @@ var rival_next := rival.steer() if rival != null else NOWHERE
   ember is armor; equals both fall, and since the player falls, the game ends. Ghost
   passes through the rival, both ways. A crashed rival is gone for the level.
 - **What the rival does not share.** Pickups are the player's alone (the rival flies
-  over them), and there is one clock: the rival keeps the player's pace, Haste and
-  water included. The rival does race you to the level's goal: if it eats that many
-  embers first, you lose.
+  over them), and there is one clock, so Haste speeds the rival up too. The ground is
+  per dragon: each tick adds the pace under a dragon's head to its `stride`, and a
+  full stride is one cell (`Arena.will_move`), so whoever is in the river wades and
+  the other flies on. A wading dragon stands still that tick, tail included, so its
+  tail tip is no longer safe to follow into. The rival does race you to the level's
+  goal: if it eats that many embers first, you lose.
 - **Optional per level, two ways.** `.with_rival()` in the campaign (the internal DSL)
   starts a level with one, as Fire Meets Water does; `summon rival` in a rules file
   (the external DSL) brings one mid-level, as The Ford does at 3 embers. Either way it
@@ -303,16 +306,19 @@ ticks: 234
   up "the same" game would drift apart sooner or later.
 - **The golden test.** `tests/golden.replay` is The Ford, flown by the rival's AI
   sitting in the player's seat (its turns went through a `PlayerController`, as keys
-  would). Replayed headless in CI, it must end as recorded: tick 234, 8 embers, the
-  rival summoned, 2 embers to it, crashed, level clear, head at (24, 13). A second
+  would). Replayed headless in CI, it must end as recorded: tick 386, 8 embers, the
+  rival summoned, 7 embers to it (one short of winning), crashed, level clear, head
+  at (29, 6). It was re-recorded when water became a per-dragon rule (see Rival
+  dragon): the old game no longer played the same, which is the test doing its job. A second
   test records a game on The Caldera, where lava spreads at random, writes it as text,
   reads it back, replays it, and compares every cell of the board.
 - **A bug it found.** The tick that killed you used to end before it was counted, so
   a replay stopped one tick short of every death. Now `Arena.tick()` counts first.
 - **What would break it:** anything random that bypasses `arena.rng` (`randi()`,
   `randf()`, iterating a Dictionary built in a random order), or rules that read the
-  clock. Pace, Haste, and water only change how often ticks happen, never what a tick
-  does, which is why replays store ticks and not seconds.
+  clock. Tempo and Haste only change how often ticks happen; water is a rule about
+  which ticks a dragon moves on (its stride), counted in ticks, so replays store
+  ticks and not seconds.
 
 **Try it:** play a level and crash, then press R to watch it again and S to save it.
 Reload the page and press R on the title banner: the saved game plays back (in the

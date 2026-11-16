@@ -7,6 +7,7 @@ const MIN_LENGTH := 2
 
 var body: Array[Vector2i] = []  # head first
 var heading := Vector2i.RIGHT
+var stride := 0.0  # progress toward the next cell; slow ground fills it over ticks (Arena)
 var _turns: Array[Vector2i] = []  # turns wait here until the next tick (Command)
 var _growth := 0  # cells still to grow, one per tick
 
@@ -52,7 +53,8 @@ func shrink(cells: int) -> void:
 
 
 ## Whether the head would hit the body by entering this cell. The tail tip is
-## safe when it is about to move away, so a dragon may chase its own tail.
-func blocks(cell: Vector2i) -> bool:
-	var solid := body.size() if _growth > 0 else body.size() - 1
+## safe when it is about to move away, so a dragon may chase its own tail (but not
+## while it is growing, or standing still in water this tick).
+func blocks(cell: Vector2i, moving := true) -> bool:
+	var solid := body.size() if _growth > 0 or not moving else body.size() - 1
 	return body.slice(0, solid).has(cell)

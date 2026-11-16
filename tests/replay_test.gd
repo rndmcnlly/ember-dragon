@@ -1,7 +1,7 @@
 extends "res://tests/test_case.gd"
 
 const TRAIL := preload("res://levels/campaign.gd")
-const HEAD := Vector2i(24, 13)  # where the golden replay's dragon ends
+const HEAD := Vector2i(29, 6)  # where the golden replay's dragon ends
 const LENGTH := 25  # 4 to start, 3 per ember; the eighth's growth never comes
 
 
@@ -11,10 +11,10 @@ func test_the_golden_replay_ends_as_recorded() -> void:
 	var replay := Replay.load_file("res://tests/golden.replay")
 	assert_eq(replay.errors, [] as Array[String])
 	var arena := replay.run(TRAIL.ember_trail())
-	assert_eq(arena.ticks, 234)
+	assert_eq(arena.ticks, 386)
 	assert_eq(arena.state, Arena.State.WON)
 	assert_eq(arena.score, 8)
-	assert_eq(arena.rival_score, 2)
+	assert_eq(arena.rival_score, 7)  # one short of winning the race
 	assert_eq(arena.rival, null)  # it crashed along the way
 	assert_eq(arena.dragon.body[0], HEAD)
 	assert_eq(arena.dragon.body.size(), LENGTH)

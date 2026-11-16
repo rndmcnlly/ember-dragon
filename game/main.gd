@@ -90,8 +90,9 @@ func _process(delta: float) -> void:
 	_clock += delta
 	while _clock >= period and arena.state == Arena.State.PLAYING:
 		_clock -= period
-		hero.before_tick(arena.dragon.body)
-		if arena.rival != null:
+		if arena.will_move(arena.dragon):  # a wading dragon keeps sliding toward its last move
+			hero.before_tick(arena.dragon.body)
+		if arena.rival != null and arena.will_move(arena.rival):
 			rival.before_tick(arena.rival.body)
 		arena.tick()
 		if watching == null:
@@ -100,8 +101,8 @@ func _process(delta: float) -> void:
 			break
 	if arena.state != Arena.State.PLAYING or _replay_over():
 		_clock = 0.0
-	var head := hero.draw(arena.dragon.body, _clock / period, delta, arena.ghost)
-	_draw_rival(_clock / period, delta)
+	var head := hero.draw(arena.dragon.body, _progress(arena.dragon, period), delta, arena.ghost)
+	_draw_rival(_progress(arena.rival, period), delta)
 	_draw_props(delta)
 	_follow(head, delta)
 	_draw_hud()
@@ -260,6 +261,15 @@ func _announce(text: String) -> void:
 	_notice_fade = create_tween()
 	_notice_fade.tween_interval(3.0)
 	_notice_fade.tween_property(notice, "modulate:a", 0.0, 0.8)
+
+
+## How far a dragon is drawn between its last two cells (0 to 1). On floor that is how
+## far the clock is toward the next tick; in water a move is spread over two ticks, so
+## the stride it has already taken counts too, and the dragon glides instead of lurching.
+func _progress(mover: Dragon, period: float) -> float:
+	if mover == null:
+		return 0.0
+	return minf(mover.stride + _clock / period * arena.board.pace_at(mover.body[0]), 1.0)
 
 
 ## The rival may hatch, or crash, in any tick; the view follows whichever is current.

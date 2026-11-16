@@ -107,6 +107,34 @@ func test_swapping_heads_is_head_on() -> void:
 	assert_eq(arena.rival, null)
 
 
+## One rule for both: the rival wades at half pace while the player, on dry ground,
+## keeps flying every tick.
+func test_the_rival_wades_through_water_too() -> void:
+	var arena := _duel(Vector2i(6, 10), Vector2i.RIGHT)
+	arena.rival_controller = Controller.new()
+	for x in range(7, 12):
+		arena.board.tiles[Vector2i(x, 10)] = "water"
+	var player_head := arena.dragon.body[0]
+	for i in 6:
+		arena.tick()
+	assert_eq(arena.dragon.body[0], player_head + Vector2i.RIGHT * 6)
+	assert_eq(arena.rival.body[0], Vector2i(9, 10))  # one cell in, then two in five ticks
+	assert_eq(arena.rival.body.size(), 4)
+
+
+## A wading dragon's tail does not move away this tick, so it is no longer safe to
+## follow into.
+func test_a_wading_rivals_tail_stays_put() -> void:
+	var arena := _duel(Vector2i(8, 6), Vector2i.DOWN)
+	arena.rival_controller = Controller.new()
+	arena.rival.body = [Vector2i(8, 6), Vector2i(8, 5), Vector2i(8, 4), Vector2i(8, 3)]
+	arena.board.tiles[Vector2i(8, 6)] = "water"  # its head wades; it will not move
+	arena.rival.stride = 0.0
+	arena.dragon.body = [Vector2i(7, 3), Vector2i(6, 3), Vector2i(5, 3), Vector2i(4, 3)]
+	arena.tick()
+	assert_eq(arena.death, "You flew into the rival")
+
+
 func test_ghost_passes_through_the_rival() -> void:
 	var arena := _duel(Vector2i(8, 6), Vector2i.DOWN)
 	arena.rival_controller = Controller.new()
