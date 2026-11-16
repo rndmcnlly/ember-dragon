@@ -11,7 +11,8 @@ var _turns: Array[Vector2i] = []  # turns wait here until the next tick (Command
 var _growth := 0  # cells still to grow, one per tick
 
 
-func _init(start: Vector2i, length := 4) -> void:
+func _init(start: Vector2i, length := 4, facing := Vector2i.RIGHT) -> void:
+	heading = facing
 	for i in length:
 		body.append(start - heading * i)
 

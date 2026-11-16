@@ -27,14 +27,14 @@ func test_the_wall_ends_the_game() -> void:
 	for i in SIZE.x:
 		arena.tick()
 	assert_eq(arena.state, Arena.State.OVER)
-	assert_eq(arena.death, "the wall")
+	assert_eq(arena.death, "You ran into the wall")
 
 
 func test_a_wall_inside_the_board_ends_the_game() -> void:
 	var arena := _started()
 	arena.board.tiles[arena.dragon.body[0] + Vector2i.RIGHT] = "wall"
 	arena.tick()
-	assert_eq(arena.death, "the wall")
+	assert_eq(arena.death, "You ran into the wall")
 
 
 func test_food_never_lands_on_a_wall() -> void:
@@ -46,7 +46,7 @@ func test_food_never_lands_on_a_wall() -> void:
 func test_biting_the_body_ends_the_game() -> void:
 	var arena := _coiled(Vector2i(4, 5))
 	arena.tick()
-	assert_eq(arena.death, "your own tail")
+	assert_eq(arena.death, "You bit your own tail")
 
 
 func test_chasing_the_tail_tip_is_safe() -> void:
@@ -99,3 +99,33 @@ func _started() -> Arena:
 	var arena := Arena.new(board)
 	arena.start()
 	return arena
+
+
+func test_lava_lets_the_head_in_then_ends_the_game() -> void:
+	var arena := _started()
+	var ahead := arena.dragon.body[0] + Vector2i.RIGHT
+	arena.board.tiles[ahead] = "lava"
+	arena.tick()
+	assert_eq(arena.dragon.body[0], ahead)
+	assert_eq(arena.death, "You fell into the lava")
+
+
+func test_water_halves_the_pace_even_with_haste() -> void:
+	var arena := _started()
+	arena.food = Vector2i(1, 1)
+	arena.board.tiles[arena.dragon.body[0] + Vector2i.RIGHT] = "water"
+	assert_eq(arena.pace(), 1.0)
+	arena.tick()
+	assert_eq(arena.pace(), 0.5)
+	arena._activate(HastePowerup.new())
+	assert_eq(arena.pace(), 1.0)
+
+
+func test_embers_only_land_where_the_tile_allows() -> void:
+	var ground := Board.bordered(SIZE)
+	for x in range(1, SIZE.x - 1):
+		for y in range(1, 5):
+			ground.tiles[Vector2i(x, y)] = ["water", "lava"][x % 2]
+	for seed in 50:
+		var arena := Arena.new(ground, seed)
+		assert_true(ground.spawns_at(arena.food))

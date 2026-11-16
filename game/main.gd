@@ -3,7 +3,6 @@
 ## The world is built by game/stage.gd and the juice by game/effects.gd.
 extends Node3D
 
-const GRID := Vector2i(42, 42)  # a 40 by 40 field inside a ring of wall
 const TICK_SECONDS := 0.11
 const CAMERA_OFFSET := Vector3(0, 6, 5)
 const WAVE_HEIGHT := 0.06  # how far each segment rises and falls
@@ -16,8 +15,10 @@ const DIRECTIONS := {
 	"ui_right": Vector2i.RIGHT,
 }
 
-var board := Board.bordered(GRID)
+var levels := Level.catalog()  # level names, from levels/*.txt
+var level: Level
 var arena: Arena
+var stage: Stage
 var meshes := {}  # piece name -> Mesh, shared by every node that shows it (Flyweight)
 var sounds := {}  # sound name -> AudioStreamPlayer
 var segments: Array[MeshInstance3D] = []
@@ -36,14 +37,20 @@ var _head_yaw := 0.0
 func _ready() -> void:
 	_load_meshes()
 	_load_sounds()
-	add_child(Stage.new(board.tiles, meshes))
+	stage = Stage.new(meshes)
+	add_child(stage)
 	_build_props()
 	_build_hud()
-	_new_game()
+	_load_level(0)
 
 
 ## Input arrives as events, so even a tap shorter than one frame is never missed.
 func _unhandled_input(event: InputEvent) -> void:
+	if arena.state != Arena.State.PLAYING and event is InputEventKey and event.pressed:
+		var choice: int = event.keycode - KEY_1  # number keys pick a level
+		if choice >= 0 and choice < mini(levels.size(), 9):
+			_load_level(choice)
+			return
 	if arena.state == Arena.State.OVER:
 		if event.is_action_pressed("ui_accept"):
 			_new_game()
@@ -56,7 +63,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Rules tick at a fixed rate; drawing happens every frame, between ticks too.
 func _process(delta: float) -> void:
-	var period := TICK_SECONDS / arena.speed
+	var period := TICK_SECONDS / arena.pace()
 	_clock += delta
 	while _clock >= period and arena.state == Arena.State.PLAYING:
 		_clock -= period
@@ -70,8 +77,20 @@ func _process(delta: float) -> void:
 	_draw_hud()
 
 
+## Read a level from levels/ and draw its ground. A broken file still gives a playable
+## field, with its errors on screen (and in the output) so the designer can fix them.
+func _load_level(index: int) -> void:
+	level = Level.load_file("res://levels/%s.txt" % levels[index])
+	for error in level.errors:
+		push_warning(error)
+	if not level.errors.is_empty():
+		level.board = Board.bordered(Vector2i(42, 42))
+	stage.draw_board(level.board)
+	_new_game()
+
+
 func _new_game() -> void:
-	arena = Arena.new(board, randi())
+	arena = Arena.new(level.board, randi())
 	arena.ate.connect(func(_cell): sounds["eat"].play())
 	arena.powered.connect(func(_powerup): sounds["power"].play())
 	arena.died.connect(func(_reason): sounds["crash"].play())
@@ -145,11 +164,14 @@ func _build_hud() -> void:
 	score_label.add_theme_font_size_override("font_size", 30)
 	# The camera keeps the head at screen center, so messages sit above it.
 	banner.anchor_right = 1.0
+	banner.offset_left = 40
+	banner.offset_right = -40
 	banner.anchor_top = 0.08
 	banner.anchor_bottom = 0.4
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	banner.add_theme_font_size_override("font_size", 34)
+	banner.add_theme_font_size_override("font_size", 30)
+	banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long level blurbs wrap
 	add_child(layer)
 
 
@@ -215,15 +237,23 @@ func _follow(head: Vector3, delta: float) -> void:
 
 
 func _draw_hud() -> void:
-	var lines := ["Embers  %d" % arena.score]
+	var lines := [level.title, "Embers  %d" % arena.score]
 	for powerup in arena.active:
 		lines.append("%s  %d" % [powerup.title, powerup.remaining])
 	score_label.text = "\n".join(lines)
 	match arena.state:
 		Arena.State.READY:
-			banner.text = "Arrow keys to fly\nEat embers to grow. Purple orbs do strange things."
+			var intro := [
+				"Level %d of %d: %s" % [levels.find(level.name) + 1, levels.size(), level.title],
+				level.blurb,
+			]
+			intro.append_array(level.errors)
+			intro.append("Arrow keys to fly    1-%d to pick a level" % levels.size())
+			banner.text = "\n".join(intro)
 		Arena.State.OVER:
-			banner.text = "You ran into %s\nPress Enter to fly again" % arena.death
+			banner.text = (
+				"%s\nEnter to fly again    1-%d to pick a level" % [arena.death, levels.size()]
+			)
 		_:
 			banner.text = ""
 

@@ -23,7 +23,7 @@ var active: Array[Powerup] = []
 var score := 0
 var state := State.READY
 var death := ""
-var speed := 1.0  # ticks per base tick; HastePowerup raises it
+var speed := 1.0  # ticks per base tick; HastePowerup raises it (see pace())
 var ghost := false  # GhostPowerup lets the head pass through the body
 var rng := RandomNumberGenerator.new()
 
@@ -31,8 +31,14 @@ var rng := RandomNumberGenerator.new()
 func _init(ground: Board, seed := 0) -> void:
 	board = ground
 	rng.seed = seed
-	dragon = Dragon.new(board.size / 2)
+	dragon = Dragon.new(board.start, 4, board.facing)
 	food = _empty_cell()
+
+
+## Ticks per base tick right now: Haste's speed times the ground under the head,
+## so wading through water at double speed comes out even.
+func pace() -> float:
+	return speed * board.pace_at(dragon.body[0])
 
 
 ## The dragon waits for the player's first move.
@@ -46,12 +52,15 @@ func tick() -> void:
 		return
 	var next := dragon.steer()
 	if board.is_solid(next):
-		_die("the wall")
+		_die("You ran into the %s" % board.kind_at(next))
 		return
 	if dragon.blocks(next) and not ghost:
-		_die("your own tail")
+		_die("You bit your own tail")
 		return
 	dragon.advance()
+	if board.is_deadly(next):  # unlike a wall, the head goes in first
+		_die("You fell into the %s" % board.kind_at(next))
+		return
 	if next == food:
 		_eat()
 	if pickup != null and next == pickup_cell:
@@ -102,6 +111,6 @@ func _empty_cell() -> Vector2i:
 			rng.randi_range(0, board.size.x - 1), rng.randi_range(0, board.size.y - 1)
 		)
 		var taken := dragon.body.has(cell) or cell == food or cell == pickup_cell
-		if not taken and not board.is_solid(cell):
+		if not taken and board.spawns_at(cell):
 			return cell
 	return Vector2i.ZERO

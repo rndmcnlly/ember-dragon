@@ -10,7 +10,9 @@ joining the project.
 | --- | --- | --- |
 | cell | one square of the grid | `Vector2i` |
 | board | the ground: one tile kind per cell | `Board.tiles` |
-| tile kind | what a cell is made of ("floor", "wall"), and what that means to the rules | `Board.TILES` |
+| tile kind | what a cell is made of (floor, wall, lava, water, bridge) and what that means to the rules | `Board.TILES` |
+| level | a map in `levels/*.txt`: headers, then one character per cell | `Level` |
+| pace | how fast the dragon flies right now: Haste times the ground under its head | `Arena.pace()` |
 | tick | one step of the rules; the dragon moves one cell | `Arena.tick()` |
 | body | the dragon's cells, head first | `Dragon.body` |
 | piece | one of the kit's models: head, straight, turn, tail | `Kit.Piece` |
@@ -37,9 +39,10 @@ joining the project.
 - **Strategy:** each `Powerup` subclass changes the arena its own way. A new one is
   a new file plus one line in `Arena.pickup_kinds`; no `match` on powerup names.
 - **Flyweight:** every segment shares one of four meshes.
-- **Type Object:** `Board.TILES` says what each tile kind means (`solid` or not).
-  The Arena asks `board.is_solid(cell)`, never "is this a wall?", so a new kind of
-  ground is a new row there plus a builder of the same name in `build_art.py`.
+- **Type Object:** `Board.TILES` says what each tile kind means (`solid`, `deadly`,
+  `pace`, `spawns`). The Arena asks `board.is_solid(cell)`, never "is this a wall?",
+  so a new kind of ground is a new row there plus a builder of the same name in
+  `build_art.py`.
 - **Data-driven:** `Kit.OPENINGS` says which sides each piece connects; one lookup
   picks the piece and rotation for every cell, so there is no case per corner.
 - **Game loop:** rules tick at a fixed rate (doubled by Haste) while drawing runs
@@ -84,3 +87,55 @@ The adapter is now three files: `game/main.gd` (loop, input, dragon, HUD),
   `effects.gd` and its two lines in `main.gd` leaves a working, quieter game.
 - **Not available on the web renderer:** screen-space reflections, volumetric fog,
   depth of field, and glow levels or blend modes. We left them out.
+
+## Levels in text files
+
+**Where:** `levels/*.txt` (the maps, with `levels/README.md` as the legend),
+`core/level.gd` (the parser), `tests/level_test.gd`.
+**Pattern:** data-driven design over a Type Object. A level file says *where* things
+are; `Board.TILES` says *what they mean*; nothing in between knows any tile by name.
+
+```
+title: First Flight
+blurb: Eat embers to grow.
+
+#########
+#..~~=..#
+#>..%%..#
+#########
+```
+
+- **Five tile kinds, four columns.** Wall is `solid` (you crash against it), lava is
+  `deadly` (your head goes in first, which is why it reads differently from a wall),
+  water has `pace` 0.5 (Haste in water comes out even), and `spawns` decides where
+  embers may land (not in water or lava). Bridges are floor that looks like a bridge:
+  their only rule is "not water".
+- **Errors cite the line.** `Level.parse` never crashes and never guesses: a ragged
+  row, a stray symbol, a missing or doubled start arrow, or a start with no room
+  for the body each become `ford.txt:7: ...`. The game shows them on the title
+  banner and falls back to an empty field, so a typo costs a glance, not a debugger.
+- **Every level is checked as winnable.** A test loads every file in `levels/` and
+  flood-fills from the start: any cell where an ember could appear but the dragon
+  could never reach fails CI. It caught two of our own maps whose start arrow sat
+  too close to a wall.
+- **The art follows the vocabulary.** `build_lava`, `build_water`, and `build_bridge`
+  in `tools/build_art.py` use the same helpers as the floor (`rounded_box`, `mottle`,
+  `sweep`). Blender names two materials "Lava" and "Water"; `game/stage.gd` finds
+  them by name and swaps in `game/lava.gdshader` (cracks of light that drift under
+  a crust) and `game/water.gdshader` (wobbling reflections), both driven by world
+  position so neighboring tiles flow as one surface. Bridges turn to span whatever
+  river they sit in (`Stage._bridge_yaw`).
+- **Export needs a nudge.** Godot only packs resources it knows; `include_filter` in
+  `export_presets.cfg` adds `levels/*.txt` to the web build.
+
+**Try it:** press 1 to 5 on the title banner to pick a level. Copy `meadow.txt` to
+`mine.txt`, draw something, and it appears as a sixth level after `deno task import`.
+
+## Menu
+
+| Item | Group | Files |
+| --- | --- | --- |
+| Levels in text files | Language | `levels/`, `core/level.gd`, `core/board.gd`, `tests/level_test.gd` |
+| Powerups | Systems | `core/powerup.gd`, `core/powerups/` |
+| Sound as code | Content | `tools/build_sfx.py`, `sfx/` |
+| Showcase art | Content | `tools/build_art.py`, `art/`, `game/stage.gd`, `game/effects.gd` |

@@ -95,6 +95,13 @@ ARCANE = pbr_material("Arcane", "#6a34d6", roughness=0.12, emission="#8a4dff", s
 ARCANE_GLOW = pbr_material("ArcaneGlow", "#d2a8ff", roughness=0.2, emission="#b77bff", strength=6.0)
 STONE = pbr_material("Stone", "#8f8777", roughness=0.85, vertex_color=True)
 WALL_STONE = pbr_material("WallStone", "#5a5049", roughness=0.9, vertex_color=True)
+# Godot finds "Lava" and "Water" by name and animates them with a small shader
+# (game/stage.gd), reading these colors as its starting point.
+LAVA = pbr_material("Lava", "#ff6418", roughness=0.6, emission="#ff4a0a", strength=2.2)
+CRUST = pbr_material("LavaCrust", "#33241e", roughness=0.95, emission="#ff3c0a", strength=0.12, vertex_color=True)
+WATER = pbr_material("Water", "#123f52", roughness=0.05)
+WOOD = pbr_material("Wood", "#9a6a3e", roughness=0.72, vertex_color=True)
+ROPE = pbr_material("Rope", "#c9a66b", roughness=0.9)
 
 
 # Small math helpers ---------------------------------------------------------------------------
@@ -496,10 +503,60 @@ def build_floor(bm):
 
 
 def build_wall(bm):
-    """A 0.7 high block on the ground: one big stone below, two smaller ones above, like brickwork."""
-    mottle(bm, rounded_box(bm, (-0.5, -0.5, 0.0), (0.5, 0.5, 0.4), 0.04, WALL_STONE), 0.6, 0.8, seed=11)
+    """A 0.7 high block: one big stone below, two smaller ones above, like brickwork.
+    Its foot reaches as deep as a flagstone, so no gap shows beside a sunken pool."""
+    mottle(bm, rounded_box(bm, (-0.5, -0.5, -0.15), (0.5, 0.5, 0.4), 0.04, WALL_STONE), 0.6, 0.8, seed=11)
     for seed, (x0, x1) in enumerate(((-0.5, 0.0), (0.0, 0.5))):
         mottle(bm, rounded_box(bm, (x0, -0.5, 0.4), (x1, 0.5, 0.7), 0.04, WALL_STONE), 0.85, 1.0, seed=seed)
+    return []
+
+
+def sheet(bm, z, material, cuts=6):
+    """A flat square filling the cell at height z, cut into a grid a shader can ripple."""
+    grid = bmesh.ops.create_grid(bm, x_segments=cuts, y_segments=cuts, size=0.5, matrix=Matrix.Translation((0, 0, z)))
+    faces = faces_of(grid["verts"])
+    for f in faces:
+        f.material_index = material
+    paint(bm, faces)
+    return faces
+
+
+def build_lava(bm):
+    """A sunken pool of molten rock: the glow sits 0.1 below the floor, so the edges of
+    the flagstones around it read as banks. Two cooling crusts float on top."""
+    sheet(bm, -0.1, LAVA)
+    for seed, (x, y, r) in enumerate(((-0.2, 0.18, 0.13), (0.22, -0.15, 0.09))):
+        rng = random.Random(seed + 30)
+        faces = ellipsoid(bm, (x, y, -0.1), (r, r * 0.8, 0.03), CRUST, segments=9, rings=5)
+        for v in {v for f in faces for v in f.verts}:  # break the outline so it reads as rock
+            v.co += Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), 0)) * r * 0.18
+        mottle(bm, faces, 0.6, 1.0, seed=seed)
+    return []
+
+
+def build_water(bm):
+    """Still water a little below the floor: smooth enough to mirror the dusk sky.
+    The ripples come from Godot's water shader, which moves this grid."""
+    sheet(bm, -0.07, WATER)
+    return []
+
+
+def build_bridge(bm):
+    """Planks across two beams, running along +Y (the direction of travel), with the
+    river showing between them. Godot turns each bridge to follow its crossing."""
+    sheet(bm, -0.07, WATER)
+    for x in (-0.36, 0.36):
+        mottle(bm, rounded_box(bm, (x - 0.05, -0.5, -0.07), (x + 0.05, 0.5, -0.005), 0.015, WOOD), 0.45, 0.6, seed=3)
+    rng = random.Random(5)
+    for i in range(6):  # each plank a little crooked, like hand-laid boards
+        y, lift, shift = -0.5 + (i + 0.5) / 6, rng.uniform(-0.006, 0.006), rng.uniform(-0.02, 0.02)
+        plank = rounded_box(bm, (-0.43 + shift, y - 0.075, -0.005 + lift), (0.43 + shift, y + 0.075, 0.035 + lift), 0.012, WOOD)
+        mottle(bm, plank, 0.7, 1.0, seed=i, rim=0.8)
+    for x in (-0.46, 0.46):
+        for y in (-0.38, 0.38):
+            mottle(bm, rounded_box(bm, (x - 0.035, y - 0.035, -0.1), (x + 0.035, y + 0.035, 0.24), 0.01, WOOD), 0.4, 0.55, seed=9)
+        rope = bezier((x, -0.38, 0.2), (x, 0.0, 0.08), (x, 0.38, 0.2))  # sags between its posts
+        sweep(bm, rope, lambda t: (0.012, 0.012), 16, ROPE, ring=6)
     return []
 
 
@@ -566,6 +623,9 @@ PIECES = {  # the dragon kit; the Godot side finds each mesh by these names
 TILES = {  # one entry per kind of ground; a new kind is one build_ function and one line here
     "floor": build_floor,
     "wall": build_wall,
+    "lava": build_lava,
+    "water": build_water,
+    "bridge": build_bridge,
 }
 
 for name, build in (PIECES | TILES).items():
