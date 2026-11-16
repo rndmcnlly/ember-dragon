@@ -30,6 +30,7 @@ var facing := Vector2i.RIGHT  # and which way it looks; the body trails behind
 static func bordered(grid_size: Vector2i) -> Board:
 	var board := Board.new()
 	board.size = grid_size
+	@warning_ignore("integer_division")
 	board.start = grid_size / 2
 	for x in grid_size.x:
 		for y in grid_size.y:

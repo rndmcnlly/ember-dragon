@@ -73,8 +73,11 @@ func _carve() -> void:
 ## toward, so it never touches the clearing. It drifts a column at a time (diagonal
 ## rows stay joined, as in The Ford) and is crossed by bridges on a few rows.
 func _river() -> void:
+	@warning_ignore("integer_division")
 	var eastward := board.start.x < SIZE.x / 2
+	@warning_ignore("integer_division")
 	var lowest := SIZE.x / 2 if eastward else 3
+	@warning_ignore("integer_division")
 	var highest := SIZE.x - 3 - RIVER_WIDTH if eastward else SIZE.x / 2 - RIVER_WIDTH - 1
 	var x := rng.randi_range(lowest, highest)
 	var drift := 0
