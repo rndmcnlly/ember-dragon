@@ -29,6 +29,28 @@ class Step:
 		if rival:
 			arena.summon_rival()
 
+	## This step's map from levels/. A broken file still gives a playable field (an
+	## empty one), with its errors listed so the game can show them.
+	func load_level() -> Level:
+		var level := Level.load_file("res://levels/%s.txt" % map)
+		if not level.errors.is_empty():
+			level.board = Board.bordered(Vector2i(42, 42))
+		return level
+
+	## This step's events, read fresh: a rulebook remembers which rules have fired.
+	func rulebook() -> Rulebook:
+		if rules.is_empty():
+			return Rulebook.new()
+		return Rulebook.load_file("res://levels/%s.rules" % rules)
+
+	## A new game of this step on its level, with every random choice drawn from seed.
+	## The game and Replay both start games here, which is why a replay matches.
+	func play(on: Level, seed: int) -> Arena:
+		var arena := Arena.new(on.board.copy(), seed)  # a copy: rules may change the ground
+		prepare(arena)
+		rulebook().attach(arena)
+		return arena
+
 
 var title := ""
 var steps: Array[Step] = []

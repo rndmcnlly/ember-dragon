@@ -5,6 +5,7 @@ extends Node3D
 
 const TICK_SECONDS := 0.11
 const CAMERA_OFFSET := Vector3(0, 6, 5)
+const REPLAY_PATH := "user://last.replay"  # in the browser, user:// lives in IndexedDB
 const DIRECTIONS := {
 	"ui_up": Vector2i.UP,
 	"ui_down": Vector2i.DOWN,
@@ -18,6 +19,8 @@ var level: Level  # that step's map
 var problems: Array[String] = []  # mistakes in the level or rules file, shown on the banner
 var arena: Arena
 var player: PlayerController  # this game's keyboard controller; arrow keys go here
+var tape: Replay  # the player's current or last game, recorded as it is played
+var watching: Replay = null  # the replay on screen, if one is playing back
 var stage: Stage
 var meshes := {}  # piece name -> Mesh, shared by every node that shows it (Flyweight)
 var sounds := {}  # sound name -> AudioStreamPlayer
@@ -33,6 +36,7 @@ var banner := Label.new()
 var notice := Label.new()  # what the level's rules say during play
 var _clock := 0.0
 var _rival_drawn: Dragon  # the rival the view is drawing, to notice one hatching
+var _notice_fade: Tween
 
 
 func _ready() -> void:
@@ -51,11 +55,23 @@ func _ready() -> void:
 
 ## Input arrives as events, so even a tap shorter than one frame is never missed.
 func _unhandled_input(event: InputEvent) -> void:
-	if arena.state != Arena.State.PLAYING and event is InputEventKey and event.pressed:
+	var paused := arena.state != Arena.State.PLAYING or _replay_over()
+	if paused and event is InputEventKey and event.pressed:
 		var choice: int = event.keycode - KEY_1  # number keys pick a level
 		if choice >= 0 and choice < mini(campaign.steps.size(), 9):
 			_load_level(choice)
 			return
+		if event.keycode == KEY_R:
+			_watch(tape if tape.ticks > 0 else Replay.load_file(REPLAY_PATH))
+			return
+		if event.keycode == KEY_S and tape.ticks > 0:
+			var saved := tape.save(REPLAY_PATH)
+			_announce("Replay saved. R watches it, even next time." if saved else "Could not save")
+			return
+	if watching != null:  # arrow keys do nothing during a replay; Enter goes back to flying
+		if event.is_action_pressed("ui_accept"):
+			_load_level(tape.level - 1)
+		return
 	if arena.state == Arena.State.OVER or arena.state == Arena.State.WON:
 		if event.is_action_pressed("ui_accept") and arena.state == Arena.State.WON:
 			_load_level(_number() % campaign.steps.size())  # the next level, or the first again
@@ -78,7 +94,11 @@ func _process(delta: float) -> void:
 		if arena.rival != null:
 			rival.before_tick(arena.rival.body)
 		arena.tick()
-	if arena.state != Arena.State.PLAYING:
+		if watching == null:
+			tape.ticks = arena.ticks
+		elif _replay_over():
+			break
+	if arena.state != Arena.State.PLAYING or _replay_over():
 		_clock = 0.0
 	var head := hero.draw(arena.dragon.body, _clock / period, delta, arena.ghost)
 	_draw_rival(_clock / period, delta)
@@ -87,28 +107,46 @@ func _process(delta: float) -> void:
 	_draw_hud()
 
 
-## Read a campaign step's map from levels/ and draw its ground. A broken file still
-## gives a playable field, with its errors on screen so the designer can fix them.
+## Read a campaign step's map and rules from levels/. A broken file still gives a
+## playable field, with its errors on screen so the designer can fix them.
 func _load_level(index: int) -> void:
 	step = campaign.steps[index]
-	level = Level.load_file("res://levels/%s.txt" % step.map)
-	if not level.errors.is_empty():
-		level.board = Board.bordered(Vector2i(42, 42))
+	level = step.load_level()
+	problems = level.errors.duplicate()
+	problems.append_array(step.rulebook().errors)
+	for problem in problems:
+		push_warning(problem)
 	_new_game()
 
 
+## A fresh game of this level, recorded from the first key.
 func _new_game() -> void:
-	arena = Arena.new(level.board.copy(), randi())  # a copy: rules may change the ground
+	watching = null
+	tape = Replay.new()
+	tape.level = _number()
+	tape.map = step.map
+	tape.seed = randi()
 	player = PlayerController.new()
+	tape.turns = player.log  # the same Dictionary: the controller writes, the tape keeps
+	_show(step.play(level, tape.seed))
 	arena.controller = player
-	step.prepare(arena)
-	problems = level.errors.duplicate()
-	if not step.rules.is_empty():
-		var rulebook := Rulebook.load_file("res://levels/%s.rules" % step.rules)
-		rulebook.attach(arena)
-		problems.append_array(rulebook.errors)
-	for problem in problems:
-		push_warning(problem)
+
+
+## Play a recording back, through the same rules, from the same seed.
+func _watch(replay: Replay) -> void:
+	var restaged := replay.restage(campaign) if replay.errors.is_empty() else null
+	if restaged == null:
+		_announce("\n".join(replay.errors))
+		return
+	step = campaign.steps[replay.level - 1]
+	level = step.load_level()
+	watching = replay
+	_show(restaged)
+
+
+## Draw a new Arena and listen to it.
+func _show(game: Arena) -> void:
+	arena = game
 	stage.draw_board(arena.board)
 	arena.announced.connect(_announce)
 	notice.modulate.a = 0.0
@@ -199,7 +237,7 @@ func _build_hud() -> void:
 	banner.anchor_top = 0.58
 	banner.anchor_bottom = 0.95
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	banner.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM  # short banners stay clear of notices
 	banner.add_theme_font_size_override("font_size", 28)
 	banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long level blurbs wrap
 	notice.anchor_right = 1.0
@@ -217,9 +255,11 @@ func _build_hud() -> void:
 func _announce(text: String) -> void:
 	notice.text = text
 	notice.modulate.a = 1.0
-	var tween := create_tween()
-	tween.tween_interval(3.0)
-	tween.tween_property(notice, "modulate:a", 0.0, 0.8)
+	if _notice_fade != null:
+		_notice_fade.kill()  # or the last message's fade would hide this one early
+	_notice_fade = create_tween()
+	_notice_fade.tween_interval(3.0)
+	_notice_fade.tween_property(notice, "modulate:a", 0.0, 0.8)
 
 
 ## The rival may hatch, or crash, in any tick; the view follows whichever is current.
@@ -254,6 +294,8 @@ func _draw_hud() -> void:
 	if arena.goal > 0:
 		embers += " / %d" % arena.goal
 	var lines := [level.title, embers]
+	if watching != null:
+		lines.append("Replay  %d / %d" % [arena.ticks, watching.ticks])
 	if arena.rival != null:
 		lines.append(
 			"Rival  %d" % arena.rival_score + (" / %d" % arena.goal if arena.goal > 0 else "")
@@ -261,6 +303,15 @@ func _draw_hud() -> void:
 	for powerup in arena.active:
 		lines.append("%s  %d" % [powerup.title, powerup.remaining])
 	score_label.text = "\n".join(lines)
+	if watching != null and (_replay_over() or arena.state != Arena.State.PLAYING):
+		var ending := arena.death if arena.state == Arena.State.OVER else "Replay over"
+		banner.text = "%s\nR to watch again    Enter to fly    %s" % [ending, _picker()]
+		return
+	if watching != null:
+		banner.text = (
+			"Replay of level %d, seed %d    Enter to fly" % [watching.level, watching.seed]
+		)
+		return
 	match arena.state:
 		Arena.State.READY:
 			var intro := [
@@ -274,10 +325,15 @@ func _draw_hud() -> void:
 			intro.append("Arrow keys to fly    %s" % _picker())
 			banner.text = "\n".join(intro)
 		Arena.State.OVER:
-			banner.text = "%s\nEnter to fly again    %s" % [arena.death, _picker()]
+			banner.text = (
+				"%s\nEnter to fly again    R replay    S save    %s" % [arena.death, _picker()]
+			)
 		Arena.State.WON:
 			if _number() < campaign.steps.size():
-				banner.text = "Level clear!\nEnter for level %d    %s" % [_number() + 1, _picker()]
+				banner.text = (
+					"Level clear!\nEnter for level %d    R replay    S save    %s"
+					% [_number() + 1, _picker()]
+				)
 			else:
 				banner.text = "You finished %s!\nEnter to start again" % campaign.title
 		_:
@@ -286,6 +342,12 @@ func _draw_hud() -> void:
 
 func _center(cell: Vector2i) -> Vector3:
 	return Vector3(cell.x + 0.5, 0, cell.y + 0.5)
+
+
+## A replay that reached its last recorded tick without the game ending (a
+## file trimmed by hand, say) stops there instead of flying on with no one steering.
+func _replay_over() -> bool:
+	return watching != null and arena.ticks >= watching.ticks
 
 
 ## This step's place in the campaign, counting from 1 as the player does.

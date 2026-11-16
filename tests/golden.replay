@@ -1,0 +1,32 @@
+# The golden replay: The Ford, flown by the rival AI in the player's seat (its turns
+# went through a PlayerController, as keys would). The rival hatches at 3 embers, eats
+# 2, crashes, and the player clears the level on tick 234. tests/replay_test.gd checks
+# every number of that ending; if a rules change moves any of them, the test says so.
+level: 2 ford
+seed: 17
+ticks: 234
+7: up
+13: left
+17: down
+18: left
+22: up
+23: right
+25: up
+27: right
+44: down
+61: left
+77: up
+91: left
+92: down
+106: right
+129: up
+131: left
+149: up
+154: left
+159: up
+169: right
+181: up
+184: left
+200: down
+206: right
+229: down

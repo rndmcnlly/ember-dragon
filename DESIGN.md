@@ -24,6 +24,7 @@ joining the project.
 | effect | a powerup in progress, counting down ticks | `Arena.active` |
 | controller | whoever steers a dragon: the keyboard, the AI, or a replay | `Controller` |
 | rival | a second dragon, steered by the AI, racing you for embers | `Arena.rival` |
+| replay | a recorded game: level, seed, and the player's turns per tick | `Replay` |
 
 ## Where things live
 
@@ -63,7 +64,7 @@ joining the project.
 - **Ghost can end mid-overlap.** We kept it: the countdown is in the corner, and
   the risk makes the powerup interesting.
 - **Seeded randomness.** `Arena.new(board, seed)` makes food placement (and every rule that rolls dice) repeatable,
-  which the tests rely on.
+  which the tests rely on, and which makes replays possible (see Replays).
 
 ## Next, if we had another week
 
@@ -271,6 +272,52 @@ var rival_next := rival.steer() if rival != null else NOWHERE
 **Try it:** play The Ford (2) and eat three embers, or Fire Meets Water (4) from the
 start. Tempt the rival across your body, or let it grow and meet it head-on.
 
+## Replays
+
+**Where:** `core/replay.gd` (the record, its text format, and `Playback`), the log in
+`core/controllers/player_controller.gd`, `Campaign.Step.play()` in `core/campaign.gd`,
+`tests/replay_test.gd` and `tests/golden.replay`; the R and S keys in `game/main.gd`.
+**Pattern:** Command plus seeded randomness. This is where two earlier decisions pay
+off. Turns were already Commands, queued and applied on a tick rather than the moment
+a key goes down; and every dice roll already came from the Arena's seeded `rng`. So a
+whole game is its level, its seed, and which commands went to which tick:
+
+```
+level: 2 ford
+seed: 17
+ticks: 234
+7: up
+13: left
+```
+
+- **Recording is one line.** `PlayerController.steer()` hands the waiting keys to the
+  dragon on a tick; it also writes them down under that tick. The rival needs no
+  recording: its AI reads the board and never rolls dice, so it decides the same way
+  again.
+- **Playback is just another controller.** `Replay.Playback` steers the player's dragon
+  from the log instead of the keyboard (Strategy again, see Rival dragon), and the
+  Arena cannot tell the difference.
+- **One way to start a game.** `Step.play(level, seed)` builds every game, in the game
+  and in `Replay.restage()`, so the map copy, tuning, rival, and rules are attached in
+  the same order and draw from the `rng` in the same order. Two code paths that set
+  up "the same" game would drift apart sooner or later.
+- **The golden test.** `tests/golden.replay` is The Ford, flown by the rival's AI
+  sitting in the player's seat (its turns went through a `PlayerController`, as keys
+  would). Replayed headless in CI, it must end as recorded: tick 234, 8 embers, the
+  rival summoned, 2 embers to it, crashed, level clear, head at (24, 13). A second
+  test records a game on The Caldera, where lava spreads at random, writes it as text,
+  reads it back, replays it, and compares every cell of the board.
+- **A bug it found.** The tick that killed you used to end before it was counted, so
+  a replay stopped one tick short of every death. Now `Arena.tick()` counts first.
+- **What would break it:** anything random that bypasses `arena.rng` (`randi()`,
+  `randf()`, iterating a Dictionary built in a random order), or rules that read the
+  clock. Pace, Haste, and water only change how often ticks happen, never what a tick
+  does, which is why replays store ticks and not seconds.
+
+**Try it:** play a level and crash, then press R to watch it again and S to save it.
+Reload the page and press R on the title banner: the saved game plays back (in the
+browser, `user://` lives in IndexedDB).
+
 ## Menu
 
 | Item | Group | Files |
@@ -280,5 +327,6 @@ start. Tempt the rival across your body, or let it grow and meet it head-on.
 | External DSL | Language | `core/rulebook.gd`, `levels/*.rules`, `levels/README.md`, `tests/rulebook_test.gd` |
 | Powerups | Systems | `core/powerup.gd`, `core/powerups/` |
 | Rival dragon | Systems | `core/controllers/`, `core/arena.gd`, `game/dragon_view.gd`, `tools/build_art.py` (`rival()`), `tests/rival_test.gd` |
+| Replays | Systems | `core/replay.gd`, `core/controllers/player_controller.gd`, `core/campaign.gd` (`Step.play`), `tests/replay_test.gd`, `tests/golden.replay` |
 | Sound as code | Content | `tools/build_sfx.py`, `sfx/` |
 | Showcase art | Content | `tools/build_art.py`, `art/`, `game/stage.gd`, `game/effects.gd` |

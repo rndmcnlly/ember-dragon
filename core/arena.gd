@@ -32,7 +32,7 @@ var pickup: Powerup = null  # waiting on the board at pickup_cell
 var pickup_cell := Vector2i(-1, -1)
 var active: Array[Powerup] = []
 var score := 0
-var ticks := 0  # ticks of play since the first move
+var ticks := 0  # ticks of play since the first move; the first tick is 1
 var goal := 0  # embers that clear the level; 0 means endless (Campaign.Step sets it)
 var state := State.READY
 var death := ""
@@ -67,6 +67,7 @@ func start() -> void:
 func tick() -> void:
 	if state != State.PLAYING:
 		return
+	ticks += 1  # first, so the tick that ends the game counts too
 	controller.steer(self, dragon)
 	if rival != null:
 		rival_controller.steer(self, rival)
@@ -96,7 +97,6 @@ func tick() -> void:
 		_activate(pickup)
 		pickup = null
 	_age_powerups()
-	ticks += 1
 	if state == State.PLAYING:
 		ticked.emit()
 
