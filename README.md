@@ -1,6 +1,6 @@
 # D4 reference solution (instructor only)
 
-Not for students. A worked example built from `../d4-dev`: baseline plus two menu items.
+Not for students. A worked example built from `../d4-dev`: the baseline plus every menu item.
 See DESIGN.md. The original starter README follows.
 
 ---
@@ -23,6 +23,23 @@ habits as D3. The dragon moves and turns; food, growth, and collisions are yours
 
 Push to `main` and `.github/workflows/deploy.yml` runs the same `deno task ci`
 on GitHub and deploys `dist/` to Pages.
+
+## Releasing
+
+Pages always shows `main`. A version tag also publishes to itch.io through
+`.github/workflows/release.yml` (butler):
+
+1. In `CHANGELOG.md`, rename `## Unreleased` to the version and date, e.g.
+   `## 1.0.0 (2026-12-04)`, and start a new empty `## Unreleased` above it.
+2. `deno task ci`, then commit.
+3. `git tag v1.0.0 && git push origin main v1.0.0`.
+
+The workflow checks that `CHANGELOG.md` has a section for the tag, runs
+`deno task ci`, and pushes `dist/` to itch.io as that version. Until the repository
+has a `BUTLER_API_KEY` secret (an itch.io API key) and an `ITCH_TARGET` variable
+(`user/game:channel`, e.g. `rndmcnlly/ember-dragon:html5`), it skips with a notice
+instead. On itch.io, set the project's kind to HTML and tick "This file will be
+played in the browser" on the uploaded `html5` channel once.
 
 ## Layout
 

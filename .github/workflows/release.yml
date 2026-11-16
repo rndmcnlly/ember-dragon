@@ -1,0 +1,96 @@
+name: Release to itch.io
+
+# Push a version tag to publish the web build to itch.io with butler:
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# Pages keeps deploying every push to main (deploy.yml); this only runs on tags.
+# It does nothing until two repository settings exist (Settings > Secrets and
+# variables > Actions): the secret BUTLER_API_KEY (from https://itch.io/user/settings/api-keys)
+# and the variable ITCH_TARGET, user/game:channel, e.g. rndmcnlly/ember-dragon:html5.
+# Without them every tag still gets a green run that says why it skipped.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "itch"
+  cancel-in-progress: false
+
+env:
+  BUTLER_VERSION: "15.32.0" # pinned, like Godot; https://broth.itch.zone/butler/linux-amd64/LATEST
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # Secrets cannot appear in an `if:`, so check them once and pass a flag along.
+      - name: Check itch.io settings
+        id: itch
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          ITCH_TARGET: ${{ vars.ITCH_TARGET }}
+        run: |
+          if [ -z "$BUTLER_API_KEY" ] || [ -z "$ITCH_TARGET" ]; then
+            echo "::notice title=itch.io release skipped::Set the BUTLER_API_KEY secret and the ITCH_TARGET variable (e.g. rndmcnlly/ember-dragon:html5) to publish tags to itch.io."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Publishing ${GITHUB_REF_NAME} to ${ITCH_TARGET}"
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Checkout
+        if: steps.itch.outputs.ready == 'true'
+        uses: actions/checkout@v7
+      # A tag names a version, so CHANGELOG.md must say what is in it: v1.2.0 needs "## 1.2.0".
+      - name: Find this version in CHANGELOG.md
+        if: steps.itch.outputs.ready == 'true' && github.ref_type == 'tag'
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          grep -Eq "^## ${version//./[.]}( |$)" CHANGELOG.md || {
+            echo "::error title=No changelog entry::CHANGELOG.md has no '## ${version}' section for tag ${GITHUB_REF_NAME}."
+            exit 1
+          }
+      - name: Setup Deno
+        if: steps.itch.outputs.ready == 'true'
+        uses: denoland/setup-deno@v2.0.5
+        with:
+          deno-version: v2.9.7
+      - name: Setup uv (for gdtoolkit lint and format)
+        if: steps.itch.outputs.ready == 'true'
+        uses: astral-sh/setup-uv@v7
+      - name: Cache Godot in .tools/
+        if: steps.itch.outputs.ready == 'true'
+        uses: actions/cache@v4
+        with:
+          path: .tools
+          key: godot-${{ runner.os }}-${{ hashFiles('scripts/godot.ts') }}
+      - name: Download pinned Godot and its web template
+        if: steps.itch.outputs.ready == 'true'
+        run: deno task setup
+      # The same checks as every push: a release is never a build CI has not seen.
+      - name: Run CI checks and export the web build
+        if: steps.itch.outputs.ready == 'true'
+        run: deno task ci
+      - name: Install butler
+        if: steps.itch.outputs.ready == 'true'
+        run: |
+          curl -fsSL -o butler.zip "https://broth.itch.zone/butler/linux-amd64/${BUTLER_VERSION}/archive/default"
+          unzip -q butler.zip -d butler
+          chmod +x butler/butler
+          butler/butler -V
+      # dist/ is the single-threaded web export, so itch.io needs no special headers.
+      # On a manual run, the version is the commit instead of a tag.
+      - name: Push dist/ to itch.io
+        if: steps.itch.outputs.ready == 'true'
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          ITCH_TARGET: ${{ vars.ITCH_TARGET }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [ "${GITHUB_REF_TYPE}" = "tag" ] || version="${GITHUB_SHA::7}"
+          butler/butler push dist "$ITCH_TARGET" --userversion "$version"

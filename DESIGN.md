@@ -1,7 +1,7 @@
 # Ember Dragon: design notes
 
-Instructor reference solution for D4: the baseline plus two menu items
-(powerups, sound made with code). Written as a pair might write it for a teammate
+Instructor showcase for D4: the baseline plus every item on the menu, one section
+each below (the Menu table at the end says where each lives). Written as a pair might write it for a teammate
 joining the project.
 
 ## Words we use
@@ -453,6 +453,41 @@ find more.
 every other tick in the river. Drop `--dry` to record it (a window opens for about
 six seconds).
 
+## Release pipeline
+
+**Where:** `.github/workflows/release.yml`, next to `deploy.yml`; `CHANGELOG.md`; the
+"Releasing" section of `README.md`.
+**Pattern:** continuous delivery. Every push to `main` is checked and deployed to
+Pages (a preview anyone can open); a version tag is a deliberate release, checked
+the same way and published to itch.io with butler, itch.io's command-line uploader.
+
+```
+git tag v1.0.0 && git push origin main v1.0.0
+```
+
+- **Inert until set up.** Secrets cannot appear in a workflow's `if:`, so the first
+  step reads `BUTLER_API_KEY` (secret) and `ITCH_TARGET` (variable, e.g.
+  `rndmcnlly/ember-dragon:html5`) and sets a flag every later step checks. Without
+  both, the run is green and its summary carries a notice saying what to set, so a
+  fork or a pair without an itch.io account never sees a red X for it.
+- **A release is a build CI has seen.** The release job runs `deno task ci` itself
+  instead of trusting an artifact from another workflow: one more minute of CI in
+  exchange for no cross-workflow plumbing. The tag names the itch.io version
+  (`--userversion 1.0.0`), so itch.io's version history matches git's.
+- **The changelog is enforced, lightly.** A tag `v1.2.0` fails before building
+  unless `CHANGELOG.md` has a `## 1.2.0` heading. Writing the entry is the release
+  ritual; the workflow only makes it hard to forget.
+- **Pinned tools, as everywhere else.** butler is downloaded at a pinned version
+  from itch.io's own channel, like Godot in `scripts/godot.ts`. The single-threaded
+  web export needs no cross-origin isolation headers, so itch.io serves it as is.
+- **Checked, not run.** No itch.io account exists yet, so nothing has been
+  published. The workflows pass `check-jsonschema` (GitHub's workflow schema) and
+  `actionlint`, and the skip logic and the changelog match were tried in a shell.
+
+**Try it:** in a fork, push a tag such as `v0.0.1` and read the run's summary for
+the skip notice. With an itch.io account, add the secret and the variable, add a
+`## 0.0.1` section to the changelog, and tag again.
+
 ## Menu
 
 | Item | Group | Files |
@@ -466,4 +501,5 @@ six seconds).
 | Procedural terrain | Content | `core/terrain.gd`, `core/campaign.gd` (`wilds`, `load_level`), `levels/wilds.rules`, `tests/terrain_test.gd`, `tests/golden-wilds.txt` |
 | Sound as code | Content | `tools/build_sfx.py`, `sfx/` |
 | Showcase art | Content | `tools/build_art.py`, `art/`, `game/stage.gd`, `game/effects.gd` |
+| Release pipeline | Process | `.github/workflows/release.yml`, `CHANGELOG.md`, `README.md` (Releasing) |
 | Agentic playtest | Process | `PLAYTEST.md`, `scripts/playtest.ts`, `playtests/`, `tests/playtest_test.gd` |
