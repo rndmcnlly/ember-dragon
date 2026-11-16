@@ -1,0 +1,19 @@
+# Circle the floor below The Caldera while its rules spread lava twice (every 40
+# ticks, levels/eruption.rules), then dive into the lava ring on purpose.
+# expect: The caldera rumbles
+# expect: became lava
+# expect: died You fell into the lava
+level: 5 caldera
+seed: 5
+ticks: 90
+9: up
+11: left
+24: down
+26: right
+39: up
+41: left
+54: down
+56: right
+69: up
+71: left
+81: up

@@ -17,6 +17,7 @@ habits as D3. The dragon moves and turns; food, growth, and collisions are yours
 | Check this computer | `deno task doctor` | Tries every step and prints a report to paste into Canvas |
 | Play it | `deno task dev` | Runs the game in a native window |
 | Open the editor | `deno task edit` | The graphical editor is still there when you want it |
+| Playtest with an agent | `deno task playtest playtests/ford-embers.replay` | Plays a plan through the game, records `video.avi`, a log, and snapshots (see PLAYTEST.md) |
 | Check before commit | `deno task ci` | Format check, lint, import, tests, web export into `dist/` |
 | See the web build | `deno task preview` | Serves `dist/` locally |
 
@@ -37,6 +38,8 @@ on GitHub and deploys `dist/` to Pages.
   four shared meshes.
 - `tools/build_art.py`: Blender as code. The dragon kit is drawn as ASCII voxel layers; edit, run
   `deno task art`, replay.
+- `playtests/`: plans for agentic playtests and the driver that plays them; evidence
+  lands in `playtests/out/` (not committed). Agents start at `PLAYTEST.md`.
 - `tests/`: `*_test.gd` files, run by `tests/run_tests.gd` (a tiny runner, no plugin).
 - `scripts/godot.ts`: finds Godot, and fails the task when Godot prints script errors.
 

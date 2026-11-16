@@ -67,7 +67,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_load_level(choice)
 			return
 		if event.keycode == KEY_R:
-			_watch(tape if tape.ticks > 0 else Replay.load_file(REPLAY_PATH))
+			watch(tape if tape.ticks > 0 else Replay.load_file(REPLAY_PATH))
 			return
 		if _growing() and event.keycode in [KEY_N, KEY_D]:  # another map, or today's
 			wild_seed = randi_range(1, 99999) if event.keycode == KEY_N else _daily_seed()
@@ -145,7 +145,7 @@ func _new_game() -> void:
 
 
 ## Play a recording back, through the same rules, from the same seed.
-func _watch(replay: Replay) -> void:
+func watch(replay: Replay) -> void:
 	var restaged := replay.restage(campaign) if replay.errors.is_empty() else null
 	if restaged == null:
 		_announce("\n".join(replay.errors))

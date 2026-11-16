@@ -26,6 +26,7 @@ joining the project.
 | controller | whoever steers a dragon: the keyboard, the AI, or a replay | `Controller` |
 | rival | a second dragon, steered by the AI, racing you for embers | `Arena.rival` |
 | replay | a recorded game: level, seed, and the player's turns per tick | `Replay` |
+| plan | a replay written by hand, for an agent's playtest | `playtests/*.replay` |
 
 ## Where things live
 
@@ -374,6 +375,84 @@ seed in the corner. In the browser, `index.html?seed=4821` opens that map direct
 (natively: `godot -- --seed=4821`). Change `ROCKS` or `RIVER_WIDTH` at the top of
 `terrain.gd` and run `deno task test` to see the guarantees hold.
 
+## Agentic playtest
+
+**Where:** `PLAYTEST.md` (instructions for a coding agent), `scripts/playtest.ts`
+(`deno task playtest`), `playtests/` (`playtest.gd` drives the game,
+`playtest_log.gd` writes the log, three sample plans), `tests/playtest_test.gd`.
+**Pattern:** agentic manual testing. An agent plays the real game from a plan and
+hands a human evidence to check: a video, an event log, and snapshots. Under it,
+patterns we already had: the plan is a list of Commands, the log is an Observer, and
+`PlaytestLog.Witness` is a Decorator around the replay's controller.
+
+```
+# Eat three embers on The Ford, crossing the lower bridge on the way to the third.
+# expect: rival hatched
+level: 2 ford
+seed: 17
+ticks: 70
+7: up
+15: left
+```
+
+- **A plan is a replay.** We already had a text format for "this level, this seed,
+  these turns on these ticks", a parser whose errors cite the line, and a controller
+  that plays it back (see Replays). A plan is that file written by hand, plus
+  comments: the first ones say what it is for, and `# expect:` lines are text that
+  `log.txt` must contain. Any game saved with S is a plan too.
+- **Ticks, not frames.** The prototype in our research notes pressed keys on video
+  frames. Here a frame is not a unit of the game: Haste, a level's tempo, and slow
+  motion change how many frames a tick takes, and water makes a dragon skip ticks.
+  A tick is one cell of movement, so a plan can be written from the log's
+  coordinates alone (`tick 6 head (11,12)`, so `7: up`), and it means the same game
+  headless, recorded, or in CI.
+- **Dry run first, then one recording.** `deno task playtest <plan>` plays the plan
+  headless (in about a second, no window), and a broken plan stops there. Only then
+  does it open a window and record with Godot's Movie Maker (`--write-movie
+  --fixed-fps 30`), which needs a real window and GPU, so it runs on the student's
+  machine and not in GitHub Actions. Both runs write `log.txt`; the task compares
+  them word for word, a free check that nothing random escaped the seed.
+- **Text first, pictures second.** Agents read text cheaply and pictures expensively,
+  so the log carries what a picture would: positions, the ember's offset from the
+  head ("8 left, 3 up from head"), the ground underfoot, and why the dragon died
+  ("head (22,1), heading up into (22,0)"). `path.txt` has one line per tick. The
+  driver saves at most ten PNGs from the viewport itself (no ffmpeg): the start,
+  one per eventful tick, three progress shots, and the end.
+- **Mistakes the log catches.** A turn planned for a tick when the dragon stands in
+  water is never asked for (the Arena only steers a dragon that moves); a turn the
+  way it already flies, or back into its neck, is ignored by `Dragon.turn()`. Both
+  happen silently in a replay, so the Witness notes which ticks were steered and the
+  log turns each into a warning with the fix ("try tick 28").
+- **Kept honest by CI.** `tests/playtest_test.gd` plays the three sample plans
+  headless and fails if any warns or misses an `expect:` line, so a rules change
+  that breaks a sample shows up in the test, not in front of a class.
+
+**Sample evidence** (kept out of git, in `playtests/out/`; rebuild it with
+`deno task playtest playtests/ford-embers.replay`, about 8 seconds):
+`playtests/out/ford-embers/` holds `summary.txt` (one screen: intent, ending
+"tick 68: died: You flew into the rival", four expectations met, no warnings),
+`log.txt` (26 lines: three embers, the bridge, the rival hatching at tick 55),
+`path.txt` (68 lines), nine snapshots from `01-tick-0000-start.png` to
+`09-tick-0068-end.png`, and `video.avi` (about 9 seconds at 30 fps, 27 MB MJPEG
+with sound).
+
+**What we learned by being the agent.** We wrote a fourth plan by following
+PLAYTEST.md word for word (Meadow: two embers, then wade the pond): three dry runs
+and one recording. The ember's offset from the head made aiming easy. What was
+awkward, and is now in the doc: after changing a turn, `path.txt` is stale past it,
+so fix one turn at a time from the earliest; reading coordinates off a map file by
+counting characters is error-prone, but an unturned dry run reports the ground and
+the crash for free; and the recording printed two summaries (the dry run's too),
+which was confusing, so now it prints one. The test that checked every plan in
+`playtests/` would have failed CI on an agent's unfinished plan; it now names the
+samples. This was the author playing the agent, so expect a small local model to
+find more.
+
+**Try it:** `deno task playtest playtests/wilds-wade.replay --dry`, then read
+`playtests/out/wilds-wade/path.txt` around tick 26 to watch the dragon stand still
+every other tick in the river. Drop `--dry` to record it (a window opens for about
+six seconds).
+
 ## Menu
 
 | Item | Group | Files |
@@ -387,3 +466,4 @@ seed in the corner. In the browser, `index.html?seed=4821` opens that map direct
 | Procedural terrain | Content | `core/terrain.gd`, `core/campaign.gd` (`wilds`, `load_level`), `levels/wilds.rules`, `tests/terrain_test.gd`, `tests/golden-wilds.txt` |
 | Sound as code | Content | `tools/build_sfx.py`, `sfx/` |
 | Showcase art | Content | `tools/build_art.py`, `art/`, `game/stage.gd`, `game/effects.gd` |
+| Agentic playtest | Process | `PLAYTEST.md`, `scripts/playtest.ts`, `playtests/`, `tests/playtest_test.gd` |

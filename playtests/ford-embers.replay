@@ -1,0 +1,15 @@
+# Eat three embers on The Ford, crossing the lower bridge on the way to the third.
+# The third ember summons the rival dragon (levels/current.rules), and we fly into it.
+# expect: score 3
+# expect: head on bridge
+# expect: rival hatched
+# expect: died You flew into the rival
+level: 2 ford
+seed: 17
+ticks: 70
+7: up
+15: left
+23: down
+36: right
+55: up
+60: right

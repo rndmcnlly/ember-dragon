@@ -1,0 +1,11 @@
+# Fly west across The Wilds grown from seed 4821 and wade the river: in water the
+# dragon moves one cell every other tick (path.txt shows it standing still).
+# expect: The Wilds: grown from the seed
+# expect: head on water
+# expect: head on floor at (3,16)
+level: 6 wilds
+seed: 4821
+ticks: 40
+1: up
+2: left
+35: up
